@@ -5,6 +5,7 @@ import { SplatRenderer, type SplatRendererHandle } from '../modules/splat/SplatR
 import { EnvironmentMap, type EnvironmentMapHandle } from '../modules/environment/EnvironmentMap'
 import { WorldCollider } from '../modules/collider/WorldCollider'
 import { CharacterController, type CharacterControllerHandle } from '../modules/character/CharacterController'
+import { FlyController, type FlyControllerHandle } from '../modules/character/FlyController'
 import { ButterflyController, type ButterflyControllerHandle } from '../modules/butterfly/ButterflyController'
 import { SceneLoader } from '../modules/scene/SceneLoader'
 import { AudioManager } from '../modules/audio/AudioManager'
@@ -31,7 +32,7 @@ function SanityFloor() {
   )
 }
 
-type CharHandle = CharacterControllerHandle | ButterflyControllerHandle
+type CharHandle = CharacterControllerHandle | ButterflyControllerHandle | FlyControllerHandle
 
 interface TransitionDriverProps {
   splatRef: React.RefObject<SplatRendererHandle | null>
@@ -97,7 +98,7 @@ export function WorldViewer({ world: desiredWorld, slug: desiredSlug }: Props) {
   const splatRef = useRef<SplatRendererHandle>(null)
   const envRef = useRef<EnvironmentMapHandle>(null)
   const charRef = useRef<CharHandle>(null)
-  const useButterfly = useDebugStore((s) => s.useButterflyController)
+  const controllerMode = useDebugStore((s) => s.controllerMode)
   const phaseRef = useRef<'idle' | 'out' | 'in'>('in')
   const revealRef = useRef(0)
   const pendingWorldRef = useRef<World | null>(null)
@@ -112,8 +113,8 @@ export function WorldViewer({ world: desiredWorld, slug: desiredSlug }: Props) {
   }, [desiredSlug, desiredWorld, activeSlug])
 
   const splatUrl = getSplatUrl(activeWorld)
-  const { ground_plane_offset } = activeWorld.assets.splats.semantics_metadata
-
+  const { ground_plane_offset, flip_y, metric_scale_factor } = activeWorld.assets.splats.semantics_metadata
+  const flipY = flip_y ?? true
   return (
     <>
       <AudioManager slug={activeSlug} active />
@@ -137,17 +138,29 @@ export function WorldViewer({ world: desiredWorld, slug: desiredSlug }: Props) {
             }}
           />
           <Physics gravity={[0, -9.81, 0]}>
-            {useButterfly ? (
+            {controllerMode === 'butterfly' ? (
               <ButterflyController ref={charRef as React.RefObject<ButterflyControllerHandle>} />
+            ) : controllerMode === 'fly' ? (
+              <FlyController ref={charRef as React.RefObject<FlyControllerHandle>} />
             ) : (
               <CharacterController ref={charRef as React.RefObject<CharacterControllerHandle>} />
             )}
-            <WorldCollider url={activeWorld.assets.mesh.collider_mesh_url} />
+            {/* Per-asset Suspense boundary: loading a new world's collider
+                must not unmount the rest of the scene (physics, character,
+                splat, env). Each suspending loader gets its own boundary so
+                only that subtree blanks while it streams in. */}
+            <Suspense fallback={null}>
+              <WorldCollider url={activeWorld.assets.mesh.collider_mesh_url} flipY={flipY} />
+            </Suspense>
             <SanityFloor />
           </Physics>
-          <SplatRenderer ref={splatRef} url={splatUrl} groundPlaneOffset={ground_plane_offset} />
-          <EnvironmentMap ref={envRef} panoUrl={activeWorld.assets.imagery.pano_url} />
-          <SceneLoader slug={activeSlug} />
+          <SplatRenderer ref={splatRef} url={splatUrl} groundPlaneOffset={ground_plane_offset} flipY={flipY} metricScaleFactor={metric_scale_factor} />
+          <Suspense fallback={null}>
+            <EnvironmentMap ref={envRef} panoUrl={activeWorld.assets.imagery.pano_url} />
+          </Suspense>
+          <Suspense fallback={null}>
+            <SceneLoader slug={activeSlug} />
+          </Suspense>
           <PostProcessing />
         </Suspense>
       </Canvas>

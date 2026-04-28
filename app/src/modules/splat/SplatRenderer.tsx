@@ -1,6 +1,22 @@
-import { useMemo, useRef, forwardRef, useImperativeHandle } from 'react'
-import { extend, useThree } from '@react-three/fiber'
+import { useMemo, useRef, forwardRef, useImperativeHandle, useEffect } from 'react'
+import { extend, useThree, useFrame } from '@react-three/fiber'
 import { SplatMesh, SparkRenderer, dyno } from '@sparkjsdev/spark'
+import { useDebugStore } from '../../store/debug'
+
+// Patch Spark's default vertex shader to swap the linear thin-lens CoC formula
+// for a configurable curve: zero blur within `sharpRange` of the focal plane,
+// then exponential growth at `falloffRate` per world unit beyond it. The
+// existing `apertureAngle` uniform stays as the overall blur strength.
+const ORIGINAL_FOCUS_BLUR =
+  'float focusBlur = abs((-viewCenter.z - focalDistance) / viewCenter.z);'
+const CUSTOM_FOCUS_BLUR = `float dist = -viewCenter.z;
+            float diff = abs(dist - focalDistance);
+            float beyond = max(0.0, diff - sharpRange);
+            float focusBlur = exp(beyond * falloffRate) - 1.0;`
+const APERTURE_DECL = 'uniform float apertureAngle;'
+const APERTURE_DECL_PLUS = `uniform float apertureAngle;
+uniform float sharpRange;
+uniform float falloffRate;`
 
 const SparkRendererEl = extend(SparkRenderer)
 const SplatMeshEl = extend(SplatMesh)
@@ -17,6 +33,8 @@ export interface SplatRendererHandle {
 interface Props {
   url: string
   groundPlaneOffset?: number
+  flipY?: boolean
+  metricScaleFactor?: number
 }
 
 function makeRevealModifier() {
@@ -57,11 +75,49 @@ function makeRevealModifier() {
 }
 
 export const SplatRenderer = forwardRef<SplatRendererHandle, Props>(
-  ({ url, groundPlaneOffset = 0 }, ref) => {
+  ({ url, groundPlaneOffset = 0, flipY, metricScaleFactor = 1 }, ref) => {
     const renderer = useThree((state) => state.gl)
     const splatRef = useRef<SplatMesh>(null)
+    const sparkRef = useRef<SparkRenderer>(null)
 
     const { revealFloat, yMinFloat, yMaxFloat, modifier } = useRef(makeRevealModifier()).current
+
+    // Patch the SparkRenderer's vertex shader once to add our custom CoC curve
+    // and inject `sharpRange` / `falloffRate` uniforms.
+    useEffect(() => {
+      const spark = sparkRef.current
+      if (!spark) return
+      const mat = spark.material
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const u = mat.uniforms as any
+      if (!u.sharpRange) u.sharpRange = { value: 2 }
+      if (!u.falloffRate) u.falloffRate = { value: 0.3 }
+      if (!mat.vertexShader.includes('uniform float sharpRange;')) {
+        mat.vertexShader = mat.vertexShader
+          .replace(APERTURE_DECL, APERTURE_DECL_PLUS)
+          .replace(ORIGINAL_FOCUS_BLUR, CUSTOM_FOCUS_BLUR)
+        mat.needsUpdate = true
+      }
+    }, [])
+
+    useFrame(() => {
+      const spark = sparkRef.current
+      if (!spark) return
+      const s = useDebugStore.getState()
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const u = spark.material.uniforms as any
+      if (s.dofEnabled) {
+        spark.focalDistance = s.focalDistance
+        spark.apertureAngle = s.apertureAngle
+        spark.falloff = s.falloff
+        if (u.sharpRange) u.sharpRange.value = s.sharpRange
+        if (u.falloffRate) u.falloffRate.value = s.falloffRate
+      } else {
+        spark.focalDistance = 0
+        spark.apertureAngle = 0
+        spark.falloff = 1
+      }
+    })
 
     useImperativeHandle(ref, () => ({
       setReveal: (amount: number) => {
@@ -89,8 +145,8 @@ export const SplatRenderer = forwardRef<SplatRendererHandle, Props>(
     )
 
     return (
-      <SparkRendererEl args={[sparkArgs]}>
-        <group position={[0, -groundPlaneOffset, 0]} rotation={[Math.PI, 0, 0]}>
+      <SparkRendererEl ref={sparkRef} args={[sparkArgs]}>
+        <group position={[0, -groundPlaneOffset, 0]} rotation={[flipY ? Math.PI : 0, 0, 0]} scale={metricScaleFactor}>
           <SplatMeshEl ref={splatRef} args={[splatArgs]} />
         </group>
       </SparkRendererEl>

@@ -11,6 +11,7 @@ export interface WorldAssets {
     semantics_metadata: {
       metric_scale_factor: number
       ground_plane_offset: number
+      flip_y?: boolean
     }
   }
   thumbnail_url: string

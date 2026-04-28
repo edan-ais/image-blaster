@@ -38,6 +38,27 @@ function worldsPlugin(): Plugin {
         server.ws.send({ type: 'full-reload' })
       }
     },
+    configureServer(server) {
+      server.watcher.add(worldsDir)
+      const MIME: Record<string, string> = {
+        '.spz': 'application/octet-stream',
+        '.glb': 'model/gltf-binary',
+        '.png': 'image/png',
+        '.webp': 'image/webp',
+        '.jpg': 'image/jpeg',
+        '.json': 'application/json',
+      }
+      server.middlewares.use('/worlds', (req, res, next) => {
+        const filePath = path.join(worldsDir, decodeURIComponent(req.url || '/'))
+        if (fs.existsSync(filePath) && fs.statSync(filePath).isFile()) {
+          const ext = path.extname(filePath).toLowerCase()
+          res.setHeader('Content-Type', MIME[ext] ?? 'application/octet-stream')
+          fs.createReadStream(filePath).pipe(res)
+        } else {
+          next()
+        }
+      })
+    },
   }
 }
 
