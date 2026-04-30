@@ -17,7 +17,7 @@ Copy `.env.example` to `.env` and fill in the keys:
 
 ```
 WORLD_LABS_API_KEY=   # Required for /image-blast-world
-FAL_KEY=              # Required for /image-blast-3d
+FAL_KEY=              # Required for /image-blast-3d and /image-blast-sfx
 ```
 
 ## Commands
@@ -46,7 +46,9 @@ worlds/
     source/      # user-supplied input files (images, prompts, etc.)
     output/
       world/     # /image-blast-world output (world.json, operation.json)
+      sfx/       # world-level ambience and arbitrary SFX
       <object>/  # generated object images, meshes, and object.json
+        sfx/     # object-specific impact or interaction sounds
     scene/       # project.json — Three.js editor scene file for arbitrary objects
 ```
 
@@ -66,7 +68,9 @@ Skills are Claude Code skills per https://code.claude.com/docs/en/skills. Each s
 
 **`/image-blast-3d [world-name]`** — Reads `worlds/<name>/objects.json` and generates or regenerates objects under `worlds/<name>/output/<object-id>/` using FAL-backed helper scripts for image isolation and Hunyuan 3D PBR mesh generation. It can also create a single object directly from a supplied image path and description.
 
-FAL API calls are implementation scripts under `.claude/scripts/asset-pipeline/`, not standalone slash-command skills. The workflow skills document when and how Claude should call those scripts.
+**`/image-blast-sfx [world-name]`** — Generates world ambience loops, object impact sounds, or arbitrary sound effects using the FAL ElevenLabs SFX endpoint. World and arbitrary SFX are saved under `worlds/<name>/output/sfx/`; object sounds are saved under `worlds/<name>/output/<object-id>/sfx/`.
+
+FAL API calls are implementation scripts under `.claude/scripts/asset-pipeline/` and `.claude/scripts/sfx/`, not standalone slash-command skills. The workflow skills document when and how Claude should call those scripts.
 
 **`input/` staging** — Drop images or other assets into `input/` (gitignored), then ask Claude what to do with them. Claude will check this folder automatically when creating worlds or processing assets.
 
@@ -103,6 +107,7 @@ Three areas to cover:
 
 - World Labs API docs: https://docs.worldlabs.ai/
 - FAL model APIs: https://fal.ai/models
+- FAL ElevenLabs sound effects endpoint: https://fal.ai/models/fal-ai/elevenlabs/sound-effects/v2
 - SparkJS docs: https://sparkjs.dev/
 - React Three Fibre docs: https://r3f.docs.pmnd.rs/
 - Leva: https://github.com/pmndrs/leva

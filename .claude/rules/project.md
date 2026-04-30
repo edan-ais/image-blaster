@@ -4,7 +4,7 @@
 
 1. Copy `.env.example` to `.env` at the project root and fill in the required keys:
    - `WORLD_LABS_API_KEY` — required for `/image-blast-world`
-   - `FAL_KEY` — required for `/image-blast-3d` FAL image and mesh generation
+   - `FAL_KEY` — required for `/image-blast-3d` image/mesh generation and `/image-blast-sfx` sound generation
 2. From `app/`: run `bun install`
 3. `worlds/` and `input/` are gitignored — create them if missing: `mkdir -p worlds input`
 
@@ -17,6 +17,7 @@ Invokable as slash commands. Full instructions in `.claude/skills/<name>/SKILL.m
 - `/threejs-edit [world-name] [instructions]` — add/modify/remove Three.js objects in a world's scene
 - `/image-blast-uncover [world-name]` — deeply analyzes `input/` and `worlds/<world>/source/` images with agent image understanding, writes `image.json`, and saves or updates the approved object manifest
 - `/image-blast-3d [world-name]` — reads the approved object manifest and generates or regenerates isolated object images and PBR meshes using FAL-backed helper scripts; can also create one object directly from a supplied image path
+- `/image-blast-sfx [world-name]` — generates world ambience loops, object impact sounds, or arbitrary sound effects using the FAL ElevenLabs SFX endpoint
 
 ## Working directory structure
 
@@ -29,7 +30,9 @@ worlds/
     source/       User-supplied input (images, prompts). Used as the stable source location.
     output/
       world/      World Labs API output: world.json, operation.json
+      sfx/        World-level ambience and arbitrary sound effects: audio files plus sfx.json
       <object>/   Object pipeline output: object.json plus generated images and meshes.
+        sfx/      Object-specific impact or interaction sounds.
     scene/        project.json — Three.js editor App-format scene file
 
 input/         Staging area for files before they're associated with a world (gitignored)
@@ -44,6 +47,8 @@ input/         Staging area for files before they're associated with a world (gi
 - `worlds/<slug>/scene/project.json` — Three.js editor scene. Written by `/threejs-edit`, loaded by the React app.
 - `worlds/<slug>/image.json` — rich image analysis written by `/image-blast-uncover`.
 - `worlds/<slug>/objects.json` — approved object manifest written by `/image-blast-uncover`, consumed by `/image-blast-3d`.
+- `worlds/<slug>/output/sfx/sfx.json` — world-level or arbitrary SFX manifest written by `/image-blast-sfx`.
+- `worlds/<slug>/output/<object>/sfx/sfx.json` — object-specific SFX manifest written by `/image-blast-sfx`.
 
 ## `input/` staging
 

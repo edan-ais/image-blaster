@@ -11,7 +11,7 @@ import {
   writeJson
 } from "../asset-pipeline/fal-queue.mjs";
 
-const PROJECT_DIRS = ["source", "output", "output/world", "scene"];
+const PROJECT_DIRS = ["source", "output", "output/world", "output/sfx", "scene"];
 
 async function readJsonIfExists(filePath) {
   return (await pathExists(filePath)) ? readJson(filePath) : undefined;
@@ -71,11 +71,13 @@ export async function ensureProjectState(options) {
   const objectsPath = path.join(worldDir, "objects.json");
   const worldJsonPath = path.join(worldDir, "output", "world", "world.json");
   const operationJsonPath = path.join(worldDir, "output", "world", "operation.json");
+  const sfxPath = path.join(worldDir, "output", "sfx");
   const scenePath = path.join(worldDir, "scene", "project.json");
 
   const objectsFile = await readJsonIfExists(objectsPath);
   const objects = objectsFile?.objects || [];
   const sourceFiles = await listFiles(path.join(worldDir, "source"));
+  const sfxFiles = await listFiles(sfxPath);
   const counts = await objectCounts(worldDir, objects);
 
   const project = {
@@ -90,6 +92,7 @@ export async function ensureProjectState(options) {
       source: path.join(worldDir, "source"),
       output: path.join(worldDir, "output"),
       world: path.join(worldDir, "output", "world"),
+      sfx: sfxPath,
       scene: path.join(worldDir, "scene"),
       image: imagePath,
       objects: objectsPath
@@ -100,6 +103,8 @@ export async function ensureProjectState(options) {
       has_image: await pathExists(imagePath),
       has_objects: await pathExists(objectsPath),
       object_counts: counts,
+      has_sfx: sfxFiles.length > 0,
+      sfx_count: sfxFiles.length,
       has_scene: await pathExists(scenePath)
     }
   };

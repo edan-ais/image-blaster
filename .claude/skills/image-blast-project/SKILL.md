@@ -1,6 +1,6 @@
 ---
 name: image-blast-project
-description: Create, inspect, and manage an Image Blast project envelope under worlds/<slug>. Use before image-blast-uncover, image-blast-world, image-blast-3d, or whenever the user asks about active project state.
+description: Create, inspect, and manage an Image Blast project envelope under worlds/<slug>. Use before image-blast-uncover, image-blast-world, image-blast-3d, image-blast-sfx, or whenever the user asks about active project state.
 argument-hint: [world-name or description] [optional instructions]
 allowed-tools: Read Write Bash(node *)
 ---
@@ -29,6 +29,7 @@ worlds/<slug>/
   source/
   output/
     world/
+    sfx/
     <object-slug>/
   scene/
 ```
@@ -42,9 +43,11 @@ Only `project.json` and directories are created automatically. `image.json` and 
    - whether World Labs output exists
    - whether `image.json` exists
    - whether `objects.json` exists and object counts by status
+   - whether world-level SFX exists
    - whether `scene/project.json` exists
 6. Recommend next actions without performing them unless the user asked:
    - `/image-blast-uncover <slug>` for image analysis and object manifest creation
    - `/image-blast-world <slug> ...` for World Labs generation
    - `/image-blast-3d <slug>` for object generation
+   - `/image-blast-sfx <slug> ...` for ambient, object-impact, or arbitrary sound effects
    - `/threejs-edit <slug> ...` for scene edits
