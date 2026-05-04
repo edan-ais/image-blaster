@@ -7,15 +7,15 @@ import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js'
 import { clone as cloneSkeleton } from 'three/examples/jsm/utils/SkeletonUtils.js'
 import { ObjectRenderMode, type WorldObjectAsset } from '../../types/world'
 import { useAudioStore } from '../../store/audio'
+import { useAssetMaterials, SHADED_COLOR, HOVER_DIM_FACTOR } from './useAssetMaterials'
 
 export const OBJECT_SCALE = 0.5
 
-const HOVER_DIM_FACTOR = 0.72
-const SHADED_COLOR = new THREE.Color(0xb8b8b8)
 const COLLIDER_WIREFRAME_COLOR = 0x00aaff
 
 type PointerHandler = (event: ThreeEvent<PointerEvent>) => void
 type HoverHandler = (objectId: string, hovering: boolean) => void
+type ClickHandler = (worldPos: THREE.Vector3) => void
 
 export interface SceneObjectHandle {
   id: string
@@ -31,6 +31,7 @@ interface Props {
   renderMode: ObjectRenderMode
   isHovered: boolean
   onHover: HoverHandler
+  onClick?: ClickHandler
   onPointerDown?: PointerHandler
   onPointerMove?: PointerHandler
   onPointerUp?: PointerHandler
@@ -40,7 +41,6 @@ interface Props {
 interface MeshMaterialState {
   mesh: THREE.Mesh
   litMaterials: THREE.Material | THREE.Material[]
-  shadedMaterial: THREE.MeshStandardMaterial
   colorEntries: Array<{ material: THREE.Material & { color: THREE.Color }; baseColor: THREE.Color }>
 }
 
@@ -64,6 +64,7 @@ export const SceneObject = forwardRef<SceneObjectHandle, Props>(function SceneOb
     renderMode,
     isHovered,
     onHover,
+    onClick,
     onPointerDown,
     onPointerMove,
     onPointerUp,
@@ -79,6 +80,8 @@ export const SceneObject = forwardRef<SceneObjectHandle, Props>(function SceneOb
   const initialPosition = useMemo(() => new THREE.Vector3(...position), [position])
   const initialRotation = useMemo(() => new THREE.Quaternion(), [])
 
+  const { wireframeMaterial, shadedMaterial, wireframeOverlayMaterial } = useAssetMaterials()
+
   const {
     scene,
     wireframeOverlayScene,
@@ -87,8 +90,6 @@ export const SceneObject = forwardRef<SceneObjectHandle, Props>(function SceneOb
     colliderCenter,
     colliderHalfExtents,
     materialStates,
-    wireframeMaterial,
-    wireframeOverlayMaterial,
     colliderWireframeMaterial,
   } = useMemo(() => {
     const clonedScene = cloneSkeleton(gltf.scene)
@@ -98,6 +99,7 @@ export const SceneObject = forwardRef<SceneObjectHandle, Props>(function SceneOb
     clonedScene.traverse((child) => {
       if (!(child instanceof THREE.Mesh)) return
 
+      child.castShadow = true
       const litMaterials = cloneMaterial(child.material)
       child.material = litMaterials
       const colorEntries = asMaterialArray(litMaterials)
@@ -107,28 +109,7 @@ export const SceneObject = forwardRef<SceneObjectHandle, Props>(function SceneOb
           baseColor: material.color.clone(),
         }))
 
-      states.push({
-        mesh: child,
-        litMaterials,
-        shadedMaterial: new THREE.MeshStandardMaterial({
-          color: SHADED_COLOR,
-          roughness: 0.75,
-          metalness: 0,
-        }),
-        colorEntries,
-      })
-    })
-
-    const overlayMaterial = new THREE.MeshBasicMaterial({
-      color: 0x000000,
-      wireframe: true,
-      toneMapped: false,
-      fog: false,
-    })
-    overlayScene.traverse((child) => {
-      if (!(child instanceof THREE.Mesh)) return
-      child.material = overlayMaterial
-      child.renderOrder = 1
+      states.push({ mesh: child, litMaterials, colorEntries })
     })
 
     const box = new THREE.Box3().setFromObject(clonedScene)
@@ -149,13 +130,6 @@ export const SceneObject = forwardRef<SceneObjectHandle, Props>(function SceneOb
         Math.max((size.z * OBJECT_SCALE) / 2, 0.01),
       ),
       materialStates: states,
-      wireframeMaterial: new THREE.MeshBasicMaterial({
-        color: 0xffffff,
-        wireframe: true,
-        toneMapped: false,
-        fog: false,
-      }),
-      wireframeOverlayMaterial: overlayMaterial,
       colliderWireframeMaterial: new THREE.MeshBasicMaterial({
         color: COLLIDER_WIREFRAME_COLOR,
         wireframe: true,
@@ -166,6 +140,19 @@ export const SceneObject = forwardRef<SceneObjectHandle, Props>(function SceneOb
   }, [gltf.scene])
 
   useEffect(() => {
+    wireframeOverlayScene.traverse((child) => {
+      if (!(child instanceof THREE.Mesh)) return
+      child.material = wireframeOverlayMaterial
+      child.renderOrder = 1
+    })
+  }, [wireframeOverlayScene, wireframeOverlayMaterial])
+
+  useEffect(() => {
+    if (renderMode === ObjectRenderMode.ShadedWireframe) {
+      shadedMaterial.color.copy(SHADED_COLOR)
+      if (isHovered) shadedMaterial.color.multiplyScalar(HOVER_DIM_FACTOR)
+    }
+
     for (const state of materialStates) {
       if (renderMode === ObjectRenderMode.Wireframe) {
         state.mesh.material = wireframeMaterial
@@ -173,9 +160,7 @@ export const SceneObject = forwardRef<SceneObjectHandle, Props>(function SceneOb
       }
 
       if (renderMode === ObjectRenderMode.ShadedWireframe) {
-        state.mesh.material = state.shadedMaterial
-        state.shadedMaterial.color.copy(SHADED_COLOR)
-        if (isHovered) state.shadedMaterial.color.multiplyScalar(HOVER_DIM_FACTOR)
+        state.mesh.material = shadedMaterial
         continue
       }
 
@@ -185,7 +170,7 @@ export const SceneObject = forwardRef<SceneObjectHandle, Props>(function SceneOb
         if (isHovered) material.color.multiplyScalar(HOVER_DIM_FACTOR)
       }
     }
-  }, [isHovered, materialStates, renderMode, wireframeMaterial])
+  }, [isHovered, materialStates, renderMode, wireframeMaterial, shadedMaterial])
 
   useEffect(() => {
     sfxRefs.current.length = object.sfxUrls.length
@@ -218,17 +203,14 @@ export const SceneObject = forwardRef<SceneObjectHandle, Props>(function SceneOb
 
   useEffect(() => {
     return () => {
-      wireframeMaterial.dispose()
-      wireframeOverlayMaterial.dispose()
       colliderWireframeMaterial.dispose()
       for (const state of materialStates) {
-        state.shadedMaterial.dispose()
         for (const material of asMaterialArray(state.litMaterials)) {
           material.dispose()
         }
       }
     }
-  }, [colliderWireframeMaterial, materialStates, wireframeMaterial, wireframeOverlayMaterial])
+  }, [colliderWireframeMaterial, materialStates])
 
   useImperativeHandle(
     ref,
@@ -272,6 +254,10 @@ export const SceneObject = forwardRef<SceneObjectHandle, Props>(function SceneOb
         onPointerOut={(event) => {
           event.stopPropagation()
           onHover(object.id, false)
+        }}
+        onClick={(event) => {
+          event.stopPropagation()
+          onClick?.(event.point.clone())
         }}
         onPointerDown={(event) => {
           if (event.button !== 0) return

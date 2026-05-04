@@ -2,6 +2,7 @@ import { useMemo, useRef, forwardRef, useImperativeHandle, useEffect } from 'rea
 import { extend, useThree, useFrame } from '@react-three/fiber'
 import { SplatMesh, SparkRenderer, dyno } from '@sparkjsdev/spark'
 import { useDebugStore } from '../../store/debug'
+import { ViewerQuality } from '../../types/world'
 
 // Patch Spark's default vertex shader to swap the linear thin-lens CoC formula
 // for a configurable curve: zero blur within `sharpRange` of the focal plane,
@@ -74,12 +75,13 @@ function makeRevealModifier() {
   return { revealFloat, yMinFloat, yMaxFloat, modifier }
 }
 
+
 export const SplatRenderer = forwardRef<SplatRendererHandle, Props>(
   ({ url, groundPlaneOffset = 0, flipY, metricScaleFactor = 1 }, ref) => {
     const renderer = useThree((state) => state.gl)
     const splatRef = useRef<SplatMesh>(null)
     const sparkRef = useRef<SparkRenderer>(null)
-
+    
     const { revealFloat, yMinFloat, yMaxFloat, modifier } = useRef(makeRevealModifier()).current
 
     // Patch the SparkRenderer's vertex shader once to add our custom CoC curve
@@ -106,7 +108,7 @@ export const SplatRenderer = forwardRef<SplatRendererHandle, Props>(
       const s = useDebugStore.getState()
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const u = spark.material.uniforms as any
-      if (s.dofEnabled) {
+      if (s.viewerQuality === ViewerQuality.High && s.dofEnabled) {
         spark.focalDistance = s.focalDistance
         spark.apertureAngle = s.apertureAngle
         spark.falloff = s.falloff
@@ -146,7 +148,7 @@ export const SplatRenderer = forwardRef<SplatRendererHandle, Props>(
 
     return (
       <SparkRendererEl ref={sparkRef} args={[sparkArgs]}>
-        <group position={[0, -groundPlaneOffset, 0]} rotation={[flipY ? Math.PI : 0, 0, 0]} scale={metricScaleFactor}>
+        <group position={[0, groundPlaneOffset, 0]} rotation={[flipY ? Math.PI : 0, 0, 0]} scale={metricScaleFactor}>
           <SplatMeshEl ref={splatRef} args={[splatArgs]} />
         </group>
       </SparkRendererEl>

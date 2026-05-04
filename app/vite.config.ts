@@ -10,12 +10,23 @@ function worldsPlugin(): Plugin {
   const RESERVED_OUTPUT_DIRS = new Set(['world', 'sfx'])
   const MODEL_EXTENSIONS = new Set(['.glb'])
   const AUDIO_EXTENSIONS = new Set(['.mp3', '.ogg', '.wav', '.m4a'])
+  const IMAGE_EXTENSIONS = new Set(['.png', '.jpg', '.jpeg', '.webp', '.avif'])
 
   function visibleFiles(dir: string) {
     if (!fs.existsSync(dir)) return []
     return fs.readdirSync(dir, { withFileTypes: true })
       .filter((file) => file.isFile() && !file.name.startsWith('.'))
       .sort((a, b) => a.name.localeCompare(b.name))
+  }
+
+  function readSourceImageUrl(slug: string): string | undefined {
+    const sourceDir = path.join(worldsDir, slug, 'source')
+    const images = visibleFiles(sourceDir).filter(
+      (f) => IMAGE_EXTENSIONS.has(path.extname(f.name).toLowerCase()),
+    )
+    if (!images.length) return undefined
+    const latest = images[images.length - 1]
+    return `/worlds/${slug}/source/${latest.name}`
   }
 
   function readObjectAssets(slug: string) {
@@ -42,10 +53,15 @@ function worldsPlugin(): Plugin {
           }
         }
 
+        const thumbnail = visibleFiles(objectDir).find(
+          (file) => IMAGE_EXTENSIONS.has(path.extname(file.name).toLowerCase()) && file.name.includes('thumbnail'),
+        )
+
         return [{
           id: entry.name,
           name: displayName,
           url: `/worlds/${slug}/output/${entry.name}/${model.name}`,
+          thumbnailUrl: thumbnail ? `/worlds/${slug}/output/${entry.name}/${thumbnail.name}` : undefined,
           sfxUrls: visibleFiles(path.join(objectDir, 'sfx'))
             .filter((file) => AUDIO_EXTENSIONS.has(path.extname(file.name).toLowerCase()))
             .map((file) => `/worlds/${slug}/output/${entry.name}/sfx/${file.name}`),
@@ -62,7 +78,7 @@ function worldsPlugin(): Plugin {
       })
       .map((slug) => {
         const raw = fs.readFileSync(path.join(worldsDir, slug, 'output', 'world', 'world.json'), 'utf-8')
-        return { slug, world: JSON.parse(raw), objectAssets: readObjectAssets(slug) }
+        return { slug, world: JSON.parse(raw), objectAssets: readObjectAssets(slug), sourceImageUrl: readSourceImageUrl(slug) }
       })
   }
 
@@ -77,7 +93,8 @@ function worldsPlugin(): Plugin {
       }
     },
     handleHotUpdate({ file, server }) {
-      if (file.startsWith(worldsDir)) {
+      const RELOAD_EXTENSIONS = new Set(['.glb', '.spz', '.mp3', '.ogg', '.wav', '.m4a'])
+      if (file.startsWith(worldsDir) && RELOAD_EXTENSIONS.has(path.extname(file).toLowerCase())) {
         const mod = server.moduleGraph.getModuleById(RESOLVED_ID)
         if (mod) server.moduleGraph.invalidateModule(mod)
         server.ws.send({ type: 'full-reload' })

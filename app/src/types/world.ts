@@ -33,6 +33,7 @@ export interface WorldObjectAsset {
   id: string
   name: string
   url: string
+  thumbnailUrl?: string
   sfxUrls: string[]
 }
 
@@ -40,6 +41,7 @@ export interface WorldEntry {
   slug: string
   world: World
   objectAssets: WorldObjectAsset[]
+  sourceImageUrl?: string
 }
 
 export enum WorldRenderMode {
@@ -52,4 +54,10 @@ export enum ObjectRenderMode {
   Lit = 'lit',
   Wireframe = 'wireframe',
   ShadedWireframe = 'shaded-wireframe',
+}
+
+export enum ViewerQuality {
+  Low = 'low',
+  Medium = 'medium',
+  High = 'high',
 }

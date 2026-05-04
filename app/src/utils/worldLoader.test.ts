@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from 'vitest'
-import type { WorldEntry } from '../types/world'
+import { ViewerQuality, type WorldEntry } from '../types/world'
 
 const exampleEntry: WorldEntry = {
   slug: 'example',
@@ -40,8 +40,44 @@ describe('worldLoader', () => {
     expect(worlds[0].world.display_name).toBe('Example World')
   })
 
-  it('getSplatUrl prefers 500k', () => {
-    const url = getSplatUrl(exampleEntry.world)
+  it('getSplatUrl prefers full-res for high quality', () => {
+    const world = {
+      ...exampleEntry.world,
+      assets: {
+        ...exampleEntry.world.assets,
+        splats: {
+          ...exampleEntry.world.assets.splats,
+          spz_urls: {
+            ...exampleEntry.world.assets.splats.spz_urls,
+            full_res: 'https://cdn.example.com/splat_full.spz',
+          },
+        },
+      },
+    }
+    const url = getSplatUrl(world, ViewerQuality.High)
+    expect(url).toBe('https://cdn.example.com/splat_full.spz')
+  })
+
+  it('getSplatUrl prefers 100k for low quality', () => {
+    const world = {
+      ...exampleEntry.world,
+      assets: {
+        ...exampleEntry.world.assets,
+        splats: {
+          ...exampleEntry.world.assets.splats,
+          spz_urls: {
+            ...exampleEntry.world.assets.splats.spz_urls,
+            '100k': 'https://cdn.example.com/splat_100k.spz',
+          },
+        },
+      },
+    }
+    const url = getSplatUrl(world, ViewerQuality.Low)
+    expect(url).toBe('https://cdn.example.com/splat_100k.spz')
+  })
+
+  it('getSplatUrl prefers 500k for medium quality', () => {
+    const url = getSplatUrl(exampleEntry.world, ViewerQuality.Medium)
     expect(url).toBe('https://cdn.example.com/splat_500k.spz')
   })
 
@@ -56,6 +92,6 @@ describe('worldLoader', () => {
         },
       },
     }
-    expect(getSplatUrl(world)).toBe('https://cdn.example.com/splat_150k.spz')
+    expect(getSplatUrl(world, ViewerQuality.Medium)).toBe('https://cdn.example.com/splat_150k.spz')
   })
 })

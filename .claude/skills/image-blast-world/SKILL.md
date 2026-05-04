@@ -33,4 +33,4 @@ Only pass `--image` or `--prompt` when explicitly provided. For explicit regener
 node .claude/scripts/project/project-state.mjs --world "$0"
 ```
 
-Final response: report the source image used when relevant, the world output path, and any failure/resume metadata.
+Final response: report the source image used when relevant, the world output path, downloaded `.glb` and `.spz` paths if present, and any failure/resume metadata.

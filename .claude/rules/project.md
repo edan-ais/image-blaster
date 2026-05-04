@@ -47,6 +47,10 @@ N-slug.ext
 
 - Every generation request (3D, world, SFX, image editing, etc.) must use Agent with `run_in_background: true` instead of parallel Skill calls, even if it's a single request so they are non-blocking.
 
+## Generation Scripts Are Synchronous
+
+All generation scripts (`generate-edit.mjs`, `generate-world.mjs`, `generate-single-asset.mjs`, `fal-elevenlabs-sfx.mjs`, etc.) block until the API call completes and print their result to stdout. **Never** run them with `run_in_background: true` or use `tail -f` to monitor their output — just run them directly and read the printed result.
+
 ## Order of Operations
 
 When doing an IMAGE-BLAST, it can be done in one-shot by following this order:
@@ -58,6 +62,7 @@ When doing an IMAGE-BLAST, it can be done in one-shot by following this order:
 5. Create a world with `Agent(image-blast-world)` from the newest source image, which may be the generated plate.
 6. Launch one 3D object agent per confirmed object to create 3D models
 7. Launch SFX agents for ambience and also for every object to create object-specific sounds.
+8. Once all assets are complete, run `npm install && npm run dev` from the `app/` directory and tell the user to open http://localhost:5173 in their browser.
 
 Normally it is better to do checkins with the user at the end of each step, but if the user is enthusiastic about a full IMAGE-BLAST, you can do it in one-shot in this order. 
 

@@ -1,17 +1,12 @@
 #!/usr/bin/env node
-import path from "node:path";
 import {
-  callFalQueue,
-  downloadRemoteFiles,
-  ensureDir,
   one,
   parseArgs,
-  toModelInputUrl,
-  writeJson
 } from "./fal-queue.mjs";
-import { buildRequestSummary, requestPath } from "./request-metadata.mjs";
+import { runFalImageTo3DProvider } from "./fal-3d-provider.mjs";
 
-const ENDPOINT = "fal-ai/hunyuan-3d/v3.1/pro/image-to-3d";
+export const HUNYUAN_3D_ENDPOINT = "fal-ai/hunyuan-3d/v3.1/pro/image-to-3d";
+export const HUNYUAN_3D_PROVIDER = "hunyuan";
 export const DEFAULT_HUNYUAN_FACE_COUNT = 60000;
 export const DEFAULT_HUNYUAN_ENABLE_PBR = true;
 export const DEFAULT_HUNYUAN_GENERATE_TYPE = "Normal";
@@ -67,43 +62,30 @@ export async function runHunyuan3D(options) {
   if (!image) throw new Error("Input image is required.");
   if (!outputDir) throw new Error("outputDir is required.");
 
-  await ensureDir(outputDir);
-  const inputImageUrl = await toModelInputUrl(image);
   const normalizedFaceCount = normalizeFaceCount(faceCount);
   const normalizedGenerateType = normalizeGenerateType(generateType);
   const normalizedEnablePbr = normalizeBoolean(enablePbr);
 
   const input = {
-    input_image_url: inputImageUrl,
     generate_type: normalizedGenerateType,
     enable_pbr: normalizedEnablePbr,
     face_count: normalizedFaceCount
   };
 
-  const result = await callFalQueue(ENDPOINT, input, {
-    metadataPath: metadataPath || requestPath(outputDir, 0, "hunyuan-3d"),
-    metadata: { kind: "3d", provider: ENDPOINT, input, ...metadata },
+  return runFalImageTo3DProvider({
+    endpoint: HUNYUAN_3D_ENDPOINT,
+    providerSlug: HUNYUAN_3D_PROVIDER,
+    imageInputKey: "input_image_url",
+    image,
+    outputDir,
+    assetName,
+    input,
+    metadataPath,
+    metadata,
     pollIntervalMs: 10000,
     onSubmit,
     onStatus
   });
-
-  const downloaded = await downloadRemoteFiles(result.data, outputDir, "hunyuan-3d");
-  const summary = buildRequestSummary({
-    kind: "3d",
-    provider: ENDPOINT,
-    metadata,
-    requestId: result.requestId,
-    submittedAt: result.submittedAt,
-    inputFiles: [image],
-    outputFiles: downloaded.map((file) => file.path),
-    downloadedFiles: downloaded,
-    result: result.data,
-    extra: { asset_name: assetName, input }
-  });
-
-  await writeJson(metadataPath || requestPath(outputDir, 0, "hunyuan-3d"), summary);
-  return summary;
 }
 
 async function main() {

@@ -1,7 +1,7 @@
 ---
 name: image-blast-3d
-description: Generate one specified 3D object. Use when the user names exactly one object to make, or provides one image plus the object name/description. Supports Hunyuan options for face count, PBR, and generation type.
-argument-hint: [world-name] [object-id/name or image path + object description] [--face-count N] [--generate-type Normal|LowPoly|Geometry] [--enable-pbr true|false]
+description: Generate one specified 3D object. Use when the user names exactly one object to make, or provides one image plus the object name/description. Defaults to Meshy image-to-3D and supports Hunyuan as an alternate provider.
+argument-hint: [world-name] [object-id/name or image path + object description] [--provider meshy|hunyuan] [--target-polycount N] [--face-count N] [--enable-pbr true|false]
 allowed-tools: Read Write Glob Bash(ls *) Bash(node .claude/scripts/project/project-state.mjs *) Bash(node .claude/scripts/asset-pipeline/generate-single-asset.mjs *)
 context: fork
 agent: image-blast-3d
@@ -46,11 +46,39 @@ Run the generator and wait for it to finish:
 node .claude/scripts/asset-pipeline/generate-single-asset.mjs --world "$0" --object-id "<object-id>"
 ```
 
-Hunyuan defaults are `--face-count 60000`, `--enable-pbr true`, and `--generate-type Normal`. If the user asks for more detail, polygon reduction, or a white geometry-only model, pass the matching options:
+Meshy is the default 3D provider. Meshy defaults are:
+
+```json
+{
+  "topology": "triangle",
+  "target_polycount": 30000,
+  "symmetry_mode": "auto",
+  "should_remesh": true,
+  "should_texture": true,
+  "rigging_height_meters": 1.7,
+  "animation_action_id": 12,
+  "enable_safety_checker": true,
+  "enable_animation": false,
+  "enable_rigging": false,
+  "enable_pbr": true
+}
+```
+
+Pass `--provider hunyuan` only when the user asks for Hunyuan. Hunyuan defaults are `--face-count 60000`, `--enable-pbr true`, and `--generate-type Normal`. If the user asks for more detail, polygon reduction, or a white geometry-only model, pass the matching options:
 
 - `--face-count <40000-1500000>`
 - `--generate-type Normal|LowPoly|Geometry`
 - `--enable-pbr true|false`
+
+For Meshy-specific requests, pass the matching options:
+
+- `--target-polycount <integer>`
+- `--topology triangle`
+- `--symmetry-mode auto`
+- `--should-remesh true|false`
+- `--should-texture true|false`
+- `--enable-animation true|false`
+- `--enable-rigging true|false`
 
 For explicit regeneration, append `--regenerate`. For direct single-image generation, use:
 

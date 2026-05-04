@@ -1,6 +1,7 @@
 import { useRoute, useLocation, Redirect } from 'wouter'
 import { Leva } from 'leva'
 import { WorldViewer } from './components/WorldViewer'
+import { WorldSidebar } from './components/WorldSidebar'
 import { BottomLeftControls } from './components/BottomLeftControls'
 import { DebugPanel } from './components/DebugPanel'
 import { TouchControls } from './components/TouchControls'
@@ -29,12 +30,15 @@ export function App() {
 
   return (
     <div className="relative w-screen h-screen bg-black overflow-hidden">
-      <div className='absolute top-0 left-0'>        
-        <Leva theme={{ sizes: { rootWidth: '380px', controlWidth: '180px' } }} />
-      </div>
+      <Leva theme={{ sizes: { rootWidth: '380px', controlWidth: '180px' } }} />
       <DebugPanel />
-      <WorldViewer world={entry.world} slug={entry.slug} objectAssets={entry.objectAssets} />
-      <BottomLeftControls worlds={worlds} activeSlug={entry.slug} />
+      <WorldViewer world={entry.world} slug={entry.slug} objectAssets={entry.objectAssets} sourceImageUrl={entry.sourceImageUrl} />
+      <div className="fixed left-4 top-4 z-10">
+        <WorldSidebar worlds={worlds} activeSlug={entry.slug} />
+      </div>
+      <div className="fixed bottom-4 left-4 z-20">
+        <BottomLeftControls />
+      </div>
       <TouchControls />
     </div>
   )

@@ -1,16 +1,26 @@
 import { create } from 'zustand'
 import { persist } from 'zustand/middleware'
-import { ObjectRenderMode, WorldRenderMode } from '../types/world'
+import { ObjectRenderMode, ViewerQuality, WorldRenderMode } from '../types/world'
 
 export type ControllerMode = 'fly' | 'fps' | 'butterfly'
 
+function defaultViewerQuality() {
+  if (typeof window === 'undefined') return ViewerQuality.High
+  const mobileQuery = '(hover: none), (pointer: coarse), (max-width: 767px)'
+  return window.matchMedia(mobileQuery).matches ? ViewerQuality.Low : ViewerQuality.High
+}
+
 interface DebugStore {
+  viewerQuality: ViewerQuality
+  setViewerQuality: (v: ViewerQuality) => void
   worldRenderMode: WorldRenderMode
   setWorldRenderMode: (v: WorldRenderMode) => void
   objectRenderMode: ObjectRenderMode
   setObjectRenderMode: (v: ObjectRenderMode) => void
   objectResetToken: number
   resetObjects: () => void
+  showOrigin: boolean
+  setShowOrigin: (v: boolean) => void
   controllerMode: ControllerMode
   setControllerMode: (v: ControllerMode) => void
   // Splat depth-of-field (Spark 2.0 built-in DoF + circle-bokeh via flat falloff)
@@ -54,12 +64,16 @@ interface DebugStore {
 export const useDebugStore = create<DebugStore>()(
   persist(
     (set) => ({
+      viewerQuality: defaultViewerQuality(),
+      setViewerQuality: (viewerQuality) => set({ viewerQuality }),
       worldRenderMode: WorldRenderMode.Combined,
       setWorldRenderMode: (worldRenderMode) => set({ worldRenderMode }),
       objectRenderMode: ObjectRenderMode.Lit,
       setObjectRenderMode: (objectRenderMode) => set({ objectRenderMode }),
       objectResetToken: 0,
       resetObjects: () => set((s) => ({ objectResetToken: s.objectResetToken + 1 })),
+      showOrigin: false,
+      setShowOrigin: (showOrigin) => set({ showOrigin }),
       controllerMode: 'fps',
       setControllerMode: (controllerMode) => set({ controllerMode }),
       dofEnabled: true,
@@ -80,7 +94,7 @@ export const useDebugStore = create<DebugStore>()(
       setBloomIntensity: (bloomIntensity) => set({ bloomIntensity }),
       bloomThreshold: 0.85,
       setBloomThreshold: (bloomThreshold) => set({ bloomThreshold }),
-      chromaticEnabled: true,
+      chromaticEnabled: false,
       setChromaticEnabled: (chromaticEnabled) => set({ chromaticEnabled }),
       chromaticOffset: 0.0008,
       setChromaticOffset: (chromaticOffset) => set({ chromaticOffset }),
@@ -101,6 +115,7 @@ export const useDebugStore = create<DebugStore>()(
       // Only persist things you'd want sticky across reloads. DoF and Post FX
       // values are always meant to start fresh from the defaults declared above.
       partialize: (s) => ({
+        viewerQuality: s.viewerQuality,
         worldRenderMode: s.worldRenderMode,
         objectRenderMode: s.objectRenderMode,
         controllerMode: s.controllerMode,

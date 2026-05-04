@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-import { readFile, readdir } from "node:fs/promises";
+import { readFile, readdir, writeFile } from "node:fs/promises";
 import path from "node:path";
 import {
   ensureDir,
@@ -18,6 +18,31 @@ import { isVisibleFile, parseIndexedName } from "../asset-pipeline/request-metad
 const ENDPOINT = "https://api.worldlabs.ai/marble/v1";
 const MODEL = "marble-1.1";
 const IMAGE_EXTENSIONS = new Set([".avif", ".gif", ".heic", ".heif", ".jpeg", ".jpg", ".png", ".webp"]);
+
+async function downloadAsset(url, destPath) {
+  const response = await fetch(url);
+  if (!response.ok) throw new Error(`Download failed (${response.status}): ${url}`);
+  await writeFile(destPath, Buffer.from(await response.arrayBuffer()));
+  return destPath;
+}
+
+async function downloadWorldAssets(worldResponse, outputDir) {
+  const assets = worldResponse.assets || {};
+  const result = {};
+
+  const glbUrl = assets.mesh?.collider_mesh_url;
+  if (glbUrl) {
+    result.glb = await downloadAsset(glbUrl, path.join(outputDir, "0-world.glb")).catch(() => null);
+  }
+
+  const spzUrls = assets.splats?.spz_urls || {};
+  const spzKey = ["150k", "500k", "100k", "full_res"].find((k) => spzUrls[k]);
+  if (spzKey) {
+    result.spz = await downloadAsset(spzUrls[spzKey], path.join(outputDir, `0-world-${spzKey}.spz`)).catch(() => null);
+  }
+
+  return result;
+}
 
 function sleep(ms) {
   return new Promise((resolve) => setTimeout(resolve, ms));
@@ -208,11 +233,14 @@ export async function generateWorld(options) {
 
   await writeJson(worldPath, completed.response);
 
+  const downloaded = await downloadWorldAssets(completed.response, outputDir);
+
   return {
     world,
     operation_id: operationId(completed),
     operation_json: operationPath,
     world_json: worldPath,
+    ...downloaded,
     route: `/${world}`
   };
 }

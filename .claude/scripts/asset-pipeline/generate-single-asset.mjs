@@ -5,8 +5,24 @@ import {
   DEFAULT_HUNYUAN_ENABLE_PBR,
   DEFAULT_HUNYUAN_FACE_COUNT,
   DEFAULT_HUNYUAN_GENERATE_TYPE,
+  HUNYUAN_3D_PROVIDER,
   runHunyuan3D
 } from "./hunyuan-3d.mjs";
+import {
+  DEFAULT_MESHY_ANIMATION_ACTION_ID,
+  DEFAULT_MESHY_ENABLE_ANIMATION,
+  DEFAULT_MESHY_ENABLE_PBR,
+  DEFAULT_MESHY_ENABLE_RIGGING,
+  DEFAULT_MESHY_ENABLE_SAFETY_CHECKER,
+  DEFAULT_MESHY_RIGGING_HEIGHT_METERS,
+  DEFAULT_MESHY_SHOULD_REMESH,
+  DEFAULT_MESHY_SHOULD_TEXTURE,
+  DEFAULT_MESHY_SYMMETRY_MODE,
+  DEFAULT_MESHY_TARGET_POLYCOUNT,
+  DEFAULT_MESHY_TOPOLOGY,
+  MESHY_3D_PROVIDER,
+  runMeshy3D
+} from "./meshy-3d.mjs";
 import { runImageEdit } from "./image-edit.mjs";
 import {
   downloadRemoteFiles,
@@ -31,8 +47,16 @@ import {
 } from "./request-metadata.mjs";
 
 const IMAGE_EXTENSIONS = new Set([".avif", ".gif", ".jpeg", ".jpg", ".png", ".webp"]);
-const MODEL_EXTENSIONS = new Set([".glb", ".obj", ".fbx", ".usdz"]);
+const MODEL_EXTENSIONS = new Set([".blend", ".fbx", ".glb", ".obj", ".stl", ".usdz"]);
 const GENERATED_OBJECT_FIELDS = new Set(["status"]);
+export const DEFAULT_3D_PROVIDER = MESHY_3D_PROVIDER;
+const MODEL_PROVIDER_ALIASES = new Map([
+  ["meshy", MESHY_3D_PROVIDER],
+  ["fal-ai/meshy/v6/image-to-3d", MESHY_3D_PROVIDER],
+  ["hunyuan", HUNYUAN_3D_PROVIDER],
+  ["hunyuan-3d", HUNYUAN_3D_PROVIDER],
+  ["fal-ai/hunyuan-3d/v3.1/pro/image-to-3d", HUNYUAN_3D_PROVIDER]
+]);
 
 async function readJsonIfExists(filePath) {
   return (await pathExists(filePath)) ? readJson(filePath) : undefined;
@@ -99,6 +123,33 @@ Requirements:
 - white background, studio lighting, centered composition
 - cropped tightly while keeping the entire object visible
 - no text, labels, hands, people, floor shadows, or duplicate objects`;
+}
+
+function resolve3DProvider(value = DEFAULT_3D_PROVIDER) {
+  const normalized = String(value || DEFAULT_3D_PROVIDER).trim().toLowerCase();
+  const provider = MODEL_PROVIDER_ALIASES.get(normalized);
+  if (!provider) {
+    throw new Error(`Unsupported 3D provider "${value}". Use one of: meshy, hunyuan.`);
+  }
+  return provider;
+}
+
+function modelRequestPrefix(request, fallbackProvider) {
+  if (request?.data?.provider_slug) return request.data.provider_slug;
+  if (request?.data?.endpoint?.includes("hunyuan")) return HUNYUAN_3D_PROVIDER;
+  if (request?.data?.endpoint?.includes("meshy")) return MESHY_3D_PROVIDER;
+  return fallbackProvider || DEFAULT_3D_PROVIDER;
+}
+
+async function run3DProvider(options) {
+  const { provider } = options;
+  if (provider === HUNYUAN_3D_PROVIDER) {
+    return runHunyuan3D(options);
+  }
+  if (provider === MESHY_3D_PROVIDER) {
+    return runMeshy3D(options);
+  }
+  throw new Error(`Unsupported 3D provider "${provider}".`);
 }
 
 function nowIso() {
@@ -286,7 +337,10 @@ async function resumeFalRequest(request, prefix, outputDir, pollIntervalMs = 500
     metadata: {
       index: request.data.index ?? request.index,
       role: request.data.role,
-      sfx_kind: request.data.sfx_kind
+      sfx_kind: request.data.sfx_kind,
+      ...(request.data.kind === "3d"
+        ? { provider_slug: request.data.provider_slug || prefix }
+        : {})
     },
     requestId: request.data.request_id,
     submittedAt: request.data.submitted_at,
@@ -312,9 +366,21 @@ export async function generateSingleObject(options) {
     description,
     regenerate = false,
     imageEditProvider,
+    modelProvider,
     hunyuanFaceCount = DEFAULT_HUNYUAN_FACE_COUNT,
     hunyuanEnablePbr = DEFAULT_HUNYUAN_ENABLE_PBR,
-    hunyuanGenerateType = DEFAULT_HUNYUAN_GENERATE_TYPE
+    hunyuanGenerateType = DEFAULT_HUNYUAN_GENERATE_TYPE,
+    meshyTopology = DEFAULT_MESHY_TOPOLOGY,
+    meshyTargetPolycount = DEFAULT_MESHY_TARGET_POLYCOUNT,
+    meshySymmetryMode = DEFAULT_MESHY_SYMMETRY_MODE,
+    meshyShouldRemesh = DEFAULT_MESHY_SHOULD_REMESH,
+    meshyShouldTexture = DEFAULT_MESHY_SHOULD_TEXTURE,
+    meshyRiggingHeightMeters = DEFAULT_MESHY_RIGGING_HEIGHT_METERS,
+    meshyAnimationActionId = DEFAULT_MESHY_ANIMATION_ACTION_ID,
+    meshyEnableSafetyChecker = DEFAULT_MESHY_ENABLE_SAFETY_CHECKER,
+    meshyEnableAnimation = DEFAULT_MESHY_ENABLE_ANIMATION,
+    meshyEnableRigging = DEFAULT_MESHY_ENABLE_RIGGING,
+    meshyEnablePbr = DEFAULT_MESHY_ENABLE_PBR
   } = options;
 
   if (!world) throw new Error("world is required.");
@@ -329,6 +395,7 @@ export async function generateSingleObject(options) {
   });
 
   const object = cleanObject(resolved.object, resolved.objectDir);
+  const provider = resolve3DProvider(modelProvider || object.model_provider || DEFAULT_3D_PROVIDER);
   await ensureDir(resolved.objectDir);
   await writeObjectIntent(resolved.objectJsonPath, world, object);
 
@@ -434,31 +501,48 @@ export async function generateSingleObject(options) {
             ? usableModelRequest
             : undefined;
       modelMetadataPath = modelRequest?.path || requestPath(resolved.objectDir, requestIndex, object.id, "model");
-      const hunyuan = modelRequest
-        ? await resumeFalRequest(modelRequest, "hunyuan-3d", resolved.objectDir, 10000)
-        : await runHunyuan3D({
+      const modelGeneration = modelRequest
+        ? await resumeFalRequest(
+            modelRequest,
+            modelRequestPrefix(modelRequest, provider),
+            resolved.objectDir,
+            10000
+          )
+        : await run3DProvider({
+            provider,
             image: generatedImagePath,
             outputDir: resolved.objectDir,
             metadataPath: modelMetadataPath,
-            metadata: { index: requestIndex },
+            metadata: { index: requestIndex, provider_slug: provider },
             assetName: object.name,
-            enablePbr: hunyuanEnablePbr,
+            faceCount: hunyuanFaceCount,
+            enablePbr: provider === MESHY_3D_PROVIDER ? meshyEnablePbr : hunyuanEnablePbr,
             generateType: hunyuanGenerateType,
-            faceCount: hunyuanFaceCount
+            topology: meshyTopology,
+            targetPolycount: meshyTargetPolycount,
+            symmetryMode: meshySymmetryMode,
+            shouldRemesh: meshyShouldRemesh,
+            shouldTexture: meshyShouldTexture,
+            riggingHeightMeters: meshyRiggingHeightMeters,
+            animationActionId: meshyAnimationActionId,
+            enableSafetyChecker: meshyEnableSafetyChecker,
+            enableAnimation: meshyEnableAnimation,
+            enableRigging: meshyEnableRigging
           });
 
       const normalizedModelFiles = await normalizeModelFiles(
-        hunyuan.downloaded_files || [],
+        modelGeneration.downloaded_files || [],
         resolved.objectDir,
         object.id,
         requestIndex
       );
       modelFiles = normalizedModelFiles.map((file) => file.path);
-      const hunyuanMetadata = (await readJsonIfExists(modelMetadataPath)) || hunyuan;
+      const modelMetadata = (await readJsonIfExists(modelMetadataPath)) || modelGeneration;
       await writeJson(modelMetadataPath, {
-        ...hunyuanMetadata,
+        ...modelMetadata,
         kind: "3d",
         index: requestIndex,
+        provider_slug: modelMetadata.provider_slug || modelRequestPrefix(modelRequest, provider),
         output_files: modelFiles,
         downloaded_files: sanitizeForMetadata(normalizedModelFiles),
         updated_at: nowIso()
@@ -473,6 +557,7 @@ export async function generateSingleObject(options) {
       object,
       object_json: resolved.objectJsonPath,
       output_dir: resolved.objectDir,
+      model_provider: provider,
       reference_image: generatedImagePath,
       model_files: modelFiles,
       request_metadata: [imageMetadataPath, modelMetadataPath].filter(Boolean)
@@ -496,7 +581,7 @@ async function main() {
 
   if (!world || (!objectId && !directImage)) {
     throw new Error(
-      "Usage: node generate-single-asset.mjs --world <world-name> (--object-id <object-id> | --image <path>) [--object-name <name>] [--description <text>] [--regenerate] [--face-count <40000-1500000>] [--generate-type Normal|LowPoly|Geometry] [--enable-pbr true|false]"
+      "Usage: node generate-single-asset.mjs --world <world-name> (--object-id <object-id> | --image <path>) [--object-name <name>] [--description <text>] [--provider meshy|hunyuan] [--regenerate] [--target-polycount 30000] [--face-count <40000-1500000>] [--enable-pbr true|false]"
     );
   }
 
@@ -508,9 +593,21 @@ async function main() {
     description: one(flags, "description"),
     regenerate: Boolean(flags.regenerate),
     imageEditProvider: one(flags, "image-edit-provider"),
+    modelProvider: one(flags, "provider") || one(flags, "3d-provider") || one(flags, "model-provider"),
     hunyuanFaceCount: one(flags, "face-count", DEFAULT_HUNYUAN_FACE_COUNT),
     hunyuanEnablePbr: one(flags, "enable-pbr", DEFAULT_HUNYUAN_ENABLE_PBR),
-    hunyuanGenerateType: one(flags, "generate-type", DEFAULT_HUNYUAN_GENERATE_TYPE)
+    hunyuanGenerateType: one(flags, "generate-type", DEFAULT_HUNYUAN_GENERATE_TYPE),
+    meshyTopology: one(flags, "topology", DEFAULT_MESHY_TOPOLOGY),
+    meshyTargetPolycount: one(flags, "target-polycount", DEFAULT_MESHY_TARGET_POLYCOUNT),
+    meshySymmetryMode: one(flags, "symmetry-mode", DEFAULT_MESHY_SYMMETRY_MODE),
+    meshyShouldRemesh: one(flags, "should-remesh", DEFAULT_MESHY_SHOULD_REMESH),
+    meshyShouldTexture: one(flags, "should-texture", DEFAULT_MESHY_SHOULD_TEXTURE),
+    meshyRiggingHeightMeters: one(flags, "rigging-height-meters", DEFAULT_MESHY_RIGGING_HEIGHT_METERS),
+    meshyAnimationActionId: one(flags, "animation-action-id", DEFAULT_MESHY_ANIMATION_ACTION_ID),
+    meshyEnableSafetyChecker: one(flags, "enable-safety-checker", DEFAULT_MESHY_ENABLE_SAFETY_CHECKER),
+    meshyEnableAnimation: one(flags, "enable-animation", DEFAULT_MESHY_ENABLE_ANIMATION),
+    meshyEnableRigging: one(flags, "enable-rigging", DEFAULT_MESHY_ENABLE_RIGGING),
+    meshyEnablePbr: one(flags, "enable-pbr", DEFAULT_MESHY_ENABLE_PBR)
   });
 
   console.log(JSON.stringify(result, null, 2));

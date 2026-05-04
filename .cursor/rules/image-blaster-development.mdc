@@ -14,12 +14,17 @@ alwaysApply: true
 - Environment keys:
   - `WORLD_LABS_API_KEY` for `/image-blast-world`.
   - `FAL_KEY` for `/image-blast-3d`, `/image-blast-sfx`, and FAL-backed image editing.
-- Viewer commands from `app/`:
+- The repository root is the Bun workspace root. Run package-manager commands from the root; do not create ad hoc root dependencies outside the workspace.
   - `bun install`
-  - `bun dev`
+  - `bun run dev`
   - `bun run build`
-  - `bun test`
+  - `bun run test`
   - `bun run typecheck`
+- The React viewer package lives in `app/`. If you need to target it directly, use root commands with `--cwd=app`:
+  - `bun --cwd=app run dev`
+  - `bun --cwd=app run build`
+  - `bun --cwd=app run test`
+  - `bun --cwd=app run typecheck`
 - `worlds/<slug>/scene/project.json` is the shared Three.js editor scene contract. It uses the Three.js editor App format and is loaded by the React app through `THREE.ObjectLoader`.
 - Keep the React viewer modular. Character controller, audio, post-processing, loading transitions, scene objects, and splat rendering should remain independent modules composed at the scene level.
 - Use `wouter` for routing. The active world is driven by `/<world-name>`, and `/` loads the first available world.

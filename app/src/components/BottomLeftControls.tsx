@@ -1,108 +1,136 @@
-import { useEffect, useState } from 'react'
-import { useLocation } from 'wouter'
-import { ArrowCounterClockwise, SpeakerHigh, SpeakerSlash, Stack } from '@phosphor-icons/react'
-import type { WorldEntry } from '../types/world'
+import {
+  ArrowCounterClockwise,
+  GlobeSimple,
+  Sphere,
+  SpeakerHigh,
+  SpeakerSlash,
+  GlobeHemisphereEast,
+  FadersHorizontalIcon,
+} from '@phosphor-icons/react'
+import { Tooltip } from '@radix-ui/themes'
+import { type ReactElement, useEffect } from 'react'
 import { useAudioStore } from '../store/audio'
 import { useDebugStore } from '../store/debug'
+import { ObjectRenderMode, ViewerQuality, WorldRenderMode } from '../types/world'
 
-interface Props {
-  worlds: WorldEntry[]
-  activeSlug: string
+const OBJECT_MODES = [
+  { mode: ObjectRenderMode.Wireframe, Icon: GlobeSimple, label: 'Wireframe' },
+  { mode: ObjectRenderMode.ShadedWireframe, Icon: Sphere, label: 'Shaded Wireframe' },
+  { mode: ObjectRenderMode.Lit, Icon: GlobeHemisphereEast, label: 'Lit' },
+] as const
+
+function ControlTooltip({ content, children }: { content: string; children: ReactElement }) {
+  return (
+    <Tooltip content={content} delayDuration={0} side="top">
+      {children}
+    </Tooltip>
+  )
 }
 
-export function BottomLeftControls({ worlds, activeSlug }: Props) {
-  const [, navigate] = useLocation()
+export function BottomLeftControls() {
   const muted = useAudioStore((s) => s.muted)
   const toggleMuted = useAudioStore((s) => s.toggleMuted)
   const resetObjects = useDebugStore((s) => s.resetObjects)
-  const [open, setOpen] = useState(false)
-  const [mounted, setMounted] = useState(false)
-  const [visible, setVisible] = useState(false)
+  const viewerQuality = useDebugStore((s) => s.viewerQuality)
+  const setViewerQuality = useDebugStore((s) => s.setViewerQuality)
+  const objectRenderMode = useDebugStore((s) => s.objectRenderMode)
+  const setObjectRenderMode = useDebugStore((s) => s.setObjectRenderMode)
+  const worldRenderMode = useDebugStore((s) => s.worldRenderMode)
+  const setWorldRenderMode = useDebugStore((s) => s.setWorldRenderMode)
 
   useEffect(() => {
-    if (open) {
-      setMounted(true)
-      const id = requestAnimationFrame(() => setVisible(true))
-      return () => cancelAnimationFrame(id)
-    } else {
-      setVisible(false)
-      const t = setTimeout(() => setMounted(false), 250)
-      return () => clearTimeout(t)
+    const onKey = (e: KeyboardEvent) => {
+      if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) return
+      const n = e.key === '1' ? 0 : e.key === '2' ? 1 : e.key === '3' ? 2 : -1
+      if (n === -1) return
+      if (e.altKey && e.shiftKey) {
+        const qualities = [ViewerQuality.Low, ViewerQuality.Medium, ViewerQuality.High]
+        setViewerQuality(qualities[n])
+      } else if (e.altKey) {
+        const worlds = [WorldRenderMode.Combined, WorldRenderMode.SplatOnly, WorldRenderMode.ObjectOnly]
+        setWorldRenderMode(worlds[n])
+      } else if (e.shiftKey) {
+        const objects = [ObjectRenderMode.Wireframe, ObjectRenderMode.ShadedWireframe, ObjectRenderMode.Lit]
+        setObjectRenderMode(objects[n])
+      }
     }
-  }, [open])
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [setObjectRenderMode, setWorldRenderMode, setViewerQuality])
 
-  const buttonBase =
-    'w-11 h-11 flex items-center justify-center rounded-full bg-black/60 backdrop-blur-md text-white hover:bg-white/15 transition-colors ring-1 ring-white/10'
+  const utilBtn =
+    'w-7 h-7 flex items-center justify-center rounded-lg text-white/55 hover:text-white hover:bg-white/10 transition-colors'
+
+  const modeBtn = (active: boolean) =>
+    `w-7 h-7 flex items-center justify-center rounded-md transition-colors ${
+      active ? 'bg-white/15 text-white' : 'text-white/45 hover:text-white/75 hover:bg-white/8'
+    }`
 
   return (
-    <div className="fixed bottom-4 left-4 z-20 flex flex-col items-start gap-3">
-      {mounted && (
-        <div
-          className={`
-            max-w-[80vw] md:max-w-md max-h-[60vh] overflow-y-auto
-            flex flex-row flex-wrap gap-2 p-3 rounded-2xl
-            bg-black/60 backdrop-blur-md ring-1 ring-white/10
-            transition-all duration-300 ease-out
-            ${visible ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-3'}
-          `}
-        >
-          {worlds.map(({ slug, world }) => {
-            const isActive = slug === activeSlug
-            const name = world.display_name || slug
-            return (
-              <button
-                key={slug}
-                onClick={() => {
-                  navigate(`/${slug}`)
-                  setOpen(false)
-                }}
-                title={name}
-                className={`
-                  group relative w-20 h-20 md:w-24 md:h-24 rounded-2xl overflow-hidden
-                  transition-all duration-200
-                  ${isActive ? 'ring-2 ring-white' : 'ring-1 ring-white/10 hover:ring-white/40'}
-                `}
-              >
-                <img
-                  src={world.assets.thumbnail_url}
-                  alt={name}
-                  className="w-full h-full object-cover"
-                />
-                <div className="absolute inset-x-0 bottom-0 px-2 py-1 text-[10px] md:text-xs font-medium text-white bg-gradient-to-t from-black/80 to-transparent truncate">
-                  {name}
-                </div>
-              </button>
-            )
-          })}
-        </div>
-      )}
+    <div className="flex items-center gap-1 px-2 py-1.5 rounded-2xl bg-black/55 backdrop-blur-md ring-1 ring-white/10">
+      {/* utility */}
+      <ControlTooltip content={muted ? 'Unmute' : 'Mute'}>
+        <button onClick={toggleMuted} className={utilBtn}>
+          {muted ? <SpeakerSlash size={16} weight="fill" /> : <SpeakerHigh size={16} weight="fill" />}
+        </button>
+      </ControlTooltip>
+      <ControlTooltip content="Reset objects">
+        <button onClick={resetObjects} className={utilBtn}>
+          <ArrowCounterClockwise size={16} weight="bold" />
+        </button>
+      </ControlTooltip>
 
-      <div className="flex flex-row gap-2">
-        <button
-          onClick={toggleMuted}
-          aria-label={muted ? 'Unmute' : 'Mute'}
-          title={muted ? 'Unmute' : 'Mute'}
-          className={buttonBase}
-        >
-          {muted ? <SpeakerSlash size={22} weight="fill" /> : <SpeakerHigh size={22} weight="fill" />}
-        </button>
-        <button
-          onClick={resetObjects}
-          aria-label="Reset objects"
-          title="Reset objects"
-          className={buttonBase}
-        >
-          <ArrowCounterClockwise size={22} weight="bold" />
-        </button>
-        <button
-          onClick={() => setOpen((v) => !v)}
-          aria-label="Load level"
-          title="Load level"
-          className={`${buttonBase} ${open ? 'bg-white/20' : ''}`}
-        >
-          <Stack size={22} weight="fill" />
-        </button>
+      <div className="w-px h-4 bg-white/15 mx-0.5" />
+
+      {/* viewer quality */}
+      <ControlTooltip content="Quality">
+        <div className="relative flex items-center gap-1 px-1.5">
+          <FadersHorizontalIcon size={13} weight="regular" className="text-white/45 flex-shrink-0" />
+          <select
+            value={viewerQuality}
+            onChange={(e) => setViewerQuality(e.target.value as ViewerQuality)}
+            className="bg-transparent text-white/80 text-[11px] font-medium border-none outline-none cursor-pointer appearance-none pr-3"
+          >
+            <option value={ViewerQuality.Low}>Low</option>
+            <option value={ViewerQuality.Medium}>Med</option>
+            <option value={ViewerQuality.High}>High</option>
+          </select>
+        </div>
+      </ControlTooltip>
+
+      <div className="w-px h-4 bg-white/15 mx-0.5" />
+
+      {/* object render mode */}
+      <div className="flex items-center gap-0.5 rounded-xl bg-white/5 px-0.5 py-0.5">
+        {OBJECT_MODES.map(({ mode, Icon, label }) => (
+          <ControlTooltip key={mode} content={label}>
+            <button
+              onClick={() => setObjectRenderMode(mode)}
+              className={modeBtn(objectRenderMode === mode)}
+            >
+              <Icon size={15} weight={objectRenderMode === mode ? 'fill' : 'regular'} />
+            </button>
+          </ControlTooltip>
+        ))}
       </div>
+
+      <div className="w-px h-4 bg-white/15 mx-0.5" />
+
+      {/* world render mode */}
+      <ControlTooltip content="World render mode">
+        <div className="relative flex items-center gap-1 px-1.5">
+          <GlobeSimple size={13} weight="regular" className="text-white/45 flex-shrink-0" />
+          <select
+            value={worldRenderMode}
+            onChange={(e) => setWorldRenderMode(e.target.value as WorldRenderMode)}
+            className="bg-transparent text-white/80 text-[11px] font-medium border-none outline-none cursor-pointer appearance-none pr-3"
+          >
+            <option value={WorldRenderMode.Combined}>All</option>
+            <option value={WorldRenderMode.SplatOnly}>Scene</option>
+            <option value={WorldRenderMode.ObjectOnly}>Objects</option>
+          </select>
+        </div>
+      </ControlTooltip>
     </div>
   )
 }

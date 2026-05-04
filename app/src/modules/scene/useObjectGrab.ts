@@ -213,6 +213,7 @@ export function useObjectGrab({ anchorRef, objectRefs }: UseObjectGrabArgs) {
 
   return {
     activeObjectId: activeGrabRef.current?.objectId ?? null,
+    activeGrabRef,
     onPointerDown,
     resetObjects,
   }

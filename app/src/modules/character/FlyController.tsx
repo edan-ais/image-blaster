@@ -1,8 +1,9 @@
 import { useRef, useEffect, forwardRef, useImperativeHandle, useCallback } from 'react'
 import { useFrame, useThree } from '@react-three/fiber'
 import * as THREE from 'three'
-import { useCameraDollyGestures } from '../camera/useCameraDollyGestures'
+import { useCameraGestures } from '../camera/useCameraGestures'
 import { shouldSuppressPointerLock } from '../interaction/pointerGuards'
+import { cameraFocusTarget } from '../camera/cameraFocus'
 
 export interface FlyControllerHandle {
   reset: () => void
@@ -33,7 +34,20 @@ export const FlyController = forwardRef<FlyControllerHandle>(function FlyControl
     camera.position.addScaledVector(_dollyForward, -deltaY * DOLLY_UNITS_PER_PIXEL)
   }, [camera])
 
-  useCameraDollyGestures({ domElement: gl.domElement, onDollyPixels: applyDolly })
+  const applyTumble = useCallback((dx: number, dy: number) => {
+    cameraFocusTarget.current = null
+    rawYaw.current -= dx * 0.004
+    rawPitch.current -= dy * 0.004
+    rawPitch.current = Math.max(-Math.PI / 2.2, Math.min(Math.PI / 2.2, rawPitch.current))
+  }, [])
+
+  const applyPan = useCallback((dx: number, dy: number) => {
+    _right.set(1, 0, 0).applyQuaternion(camera.quaternion)
+    camera.position.addScaledVector(_right, dx * DOLLY_UNITS_PER_PIXEL)
+    camera.position.addScaledVector(_up, dy * DOLLY_UNITS_PER_PIXEL)
+  }, [camera])
+
+  useCameraGestures({ domElement: gl.domElement, onDollyPixels: applyDolly, onTumblePixels: applyTumble, onPanPixels: applyPan })
 
   useImperativeHandle(ref, () => ({
     reset: () => {
@@ -61,6 +75,7 @@ export const FlyController = forwardRef<FlyControllerHandle>(function FlyControl
 
     const onMouseMove = (e: MouseEvent) => {
       if (document.pointerLockElement !== gl.domElement) return
+      cameraFocusTarget.current = null  // cancel focus on manual look
       rawYaw.current -= e.movementX * 0.002
       rawPitch.current -= e.movementY * 0.002
       rawPitch.current = Math.max(-Math.PI / 2.2, Math.min(Math.PI / 2.2, rawPitch.current))
@@ -76,6 +91,23 @@ export const FlyController = forwardRef<FlyControllerHandle>(function FlyControl
   }, [gl])
 
   useFrame((_state, delta) => {
+    // Camera focus: lerp rawYaw/rawPitch toward clicked object (only when pointer is not locked)
+    const focusTarget = cameraFocusTarget.current
+    if (focusTarget && document.pointerLockElement !== gl.domElement) {
+      const dir = new THREE.Vector3().subVectors(focusTarget, camera.position).normalize()
+      const targetPitch = Math.asin(Math.max(-1, Math.min(1, dir.y)))
+      const targetYaw = Math.atan2(-dir.x, -dir.z)
+      const t = 1 - Math.pow(0.04, delta)  // ~smooth decay
+      // wrap yaw diff to [-π, π] to avoid spinning the long way
+      const yawDiff = ((targetYaw - rawYaw.current + Math.PI * 3) % (Math.PI * 2)) - Math.PI
+      rawYaw.current += yawDiff * t
+      rawPitch.current += (targetPitch - rawPitch.current) * t
+      rawPitch.current = Math.max(-Math.PI / 2.2, Math.min(Math.PI / 2.2, rawPitch.current))
+      if (Math.abs(yawDiff * t) < 0.0005 && Math.abs((targetPitch - rawPitch.current) * t) < 0.0005) {
+        cameraFocusTarget.current = null
+      }
+    }
+
     smoothYaw.current += (rawYaw.current - smoothYaw.current) * (1 - Math.pow(1 - SMOOTH, 1))
     smoothPitch.current += (rawPitch.current - smoothPitch.current) * (1 - Math.pow(1 - SMOOTH, 1))
     _euler.set(smoothPitch.current, smoothYaw.current, 0)
@@ -87,7 +119,7 @@ export const FlyController = forwardRef<FlyControllerHandle>(function FlyControl
     if (k.has('KeyS') || k.has('ArrowDown')) fwd -= 1
     if (k.has('KeyA') || k.has('ArrowLeft')) strafe -= 1
     if (k.has('KeyD') || k.has('ArrowRight')) strafe += 1
-    if (k.has('KeyE') || k.has('Space')) vert += 1
+    if (k.has('KeyE')) vert += 1
     if (k.has('KeyQ')) vert -= 1
 
     _forward.set(0, 0, -1).applyQuaternion(camera.quaternion)
