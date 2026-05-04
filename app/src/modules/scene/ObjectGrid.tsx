@@ -11,6 +11,7 @@ import { cameraFocusTarget, pendingFocusId } from '../camera/cameraFocus'
 const GRID_CELL_SIZE = 1
 const SPAWN_RADIUS = 0.25
 const SPAWN_INTERVAL_MS = 250
+const _focusPoint = new THREE.Vector3()
 
 interface SpawnedObject {
   instanceId: string
@@ -89,9 +90,9 @@ export function ObjectGrid({ objects }: Props) {
     if (!asset) return
 
     const handle = objectRefs.current.get(hoveredId)?.current
-    const translation = handle?.rigidBody?.translation()
-    const origin: [number, number, number] = translation
-      ? [translation.x, translation.y, translation.z]
+    const focusPoint = handle?.getFocusPoint(_focusPoint)
+    const origin: [number, number, number] = focusPoint
+      ? [focusPoint.x, focusPoint.y, focusPoint.z]
       : [0, 1, 0]
 
     const offset = randomOnSphere(SPAWN_RADIUS)
@@ -156,18 +157,17 @@ export function ObjectGrid({ objects }: Props) {
     const id = pendingFocusId.current
     if (id) {
       pendingFocusId.current = null
-      const translation = objectRefs.current.get(id)?.current?.rigidBody?.translation()
-      if (translation) {
-        cameraFocusTarget.current = new THREE.Vector3(translation.x, translation.y, translation.z)
+      const point = objectRefs.current.get(id)?.current?.getFocusPoint(_focusPoint)
+      if (point) {
+        cameraFocusTarget.current = point.clone()
       }
     }
 
     const sphere = anchorSphereRef.current
     if (sphere) {
       const grab = activeGrabRef.current
-      if (grab && anchorRef.current) {
-        const t = anchorRef.current.translation()
-        sphere.position.set(t.x, t.y, t.z)
+      if (grab) {
+        sphere.position.copy(grab.target)
         sphere.visible = true
       } else {
         sphere.visible = false

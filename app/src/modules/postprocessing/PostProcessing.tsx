@@ -1,13 +1,17 @@
 import { useEffect, useMemo } from 'react'
 import { EffectComposer } from '@react-three/postprocessing'
-import { BlendFunction, BloomEffect, ChromaticAberrationEffect } from 'postprocessing'
+import { BlendFunction, BloomEffect, ChromaticAberrationEffect, KernelSize } from 'postprocessing'
 import { useThree, useFrame } from '@react-three/fiber'
 import * as THREE from 'three'
 import { MotionBlurEffect } from './MotionBlurEffect'
 import { useDebugStore } from '../../store/debug'
 
 const _prevQuat = new THREE.Quaternion()
-const _delta = new THREE.Quaternion()
+const _prevForward = new THREE.Vector3()
+const _currentForward = new THREE.Vector3()
+const _deltaForward = new THREE.Vector3()
+const _cameraRight = new THREE.Vector3()
+const _cameraUp = new THREE.Vector3()
 
 function OptionalEffect({ enabled, object }: { enabled: boolean; object: object }) {
   return enabled ? <primitive object={object} /> : null
@@ -32,7 +36,9 @@ export function PostProcessing() {
       luminanceThreshold: initial.bloomThreshold,
       luminanceSmoothing: 0.9,
       blendFunction: BlendFunction.ADD,
-      mipmapBlur: true,
+      kernelSize: KernelSize.MEDIUM,
+      mipmapBlur: false,
+      resolutionScale: 0.35,
     })
   }, [])
 
@@ -50,6 +56,7 @@ export function PostProcessing() {
 
   useEffect(() => {
     _prevQuat.copy(camera.quaternion)
+    camera.getWorldDirection(_prevForward)
   }, [camera])
 
   useEffect(() => {
@@ -69,11 +76,18 @@ export function PostProcessing() {
 
     chromaEffect.offset.set(s.chromaticOffset, s.chromaticOffset)
 
-    _delta.copy(_prevQuat).invert().multiply(camera.quaternion)
-    const angle = 2 * Math.acos(Math.min(1, Math.abs(_delta.w)))
+    camera.getWorldDirection(_currentForward)
+    _deltaForward.copy(_currentForward).sub(_prevForward)
+    _cameraRight.set(1, 0, 0).applyQuaternion(camera.quaternion)
+    _cameraUp.set(0, 1, 0).applyQuaternion(camera.quaternion)
+
+    const x = _deltaForward.dot(_cameraRight)
+    const y = _deltaForward.dot(_cameraUp)
+    const angle = _deltaForward.length()
     const strength = Math.min(angle * s.motionBlurStrength * 8, 1)
-    blurEffect.setVelocity(_delta.x * 0.5, _delta.y * 0.5, strength)
+    blurEffect.setVelocity(x * 0.5, y * 0.5, strength)
     _prevQuat.copy(camera.quaternion)
+    _prevForward.copy(_currentForward)
   })
 
   const hasEffects = bloomEnabled || chromaticEnabled || motionBlurEnabled
@@ -86,10 +100,10 @@ export function PostProcessing() {
   ].join('|')
 
   return (
-    <EffectComposer key={effectKey}>
-      <OptionalEffect enabled={bloomEnabled} object={bloomEffect} />
-      <OptionalEffect enabled={chromaticEnabled} object={chromaEffect} />
-      <OptionalEffect enabled={motionBlurEnabled} object={blurEffect} />
+    <EffectComposer key={effectKey} multisampling={0}>
+      <OptionalEffect key="blur" enabled={motionBlurEnabled} object={blurEffect} />
+      <OptionalEffect key="bloom" enabled={bloomEnabled} object={bloomEffect} />
+      <OptionalEffect key="chroma" enabled={chromaticEnabled} object={chromaEffect} />
     </EffectComposer>
   )
 }

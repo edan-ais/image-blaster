@@ -100,6 +100,7 @@ export function WorldViewer({ world: desiredWorld, slug: desiredSlug, objectAsse
   const objectRenderMode = useDebugStore((s) => s.objectRenderMode)
   const viewerQuality = useDebugStore((s) => s.viewerQuality)
   const controllerMode = useDebugStore((s) => s.controllerMode)
+  const controllerResetToken = useDebugStore((s) => s.controllerResetToken)
   const environmentIntensity = useDebugStore((s) => s.environmentIntensity)
   const sunIntensity = useDebugStore((s) => s.sunIntensity)
   const sunColor = useDebugStore((s) => s.sunColor)
@@ -119,6 +120,10 @@ export function WorldViewer({ world: desiredWorld, slug: desiredSlug, objectAsse
       phaseRef.current = 'out'
     }
   }, [desiredSlug, desiredWorld, desiredObjectAssets, desiredSourceImageUrl, activeSlug])
+
+  useEffect(() => {
+    if (controllerResetToken > 0) charRef.current?.reset()
+  }, [controllerResetToken])
 
   const splatUrl = getSplatUrl(activeWorld, viewerQuality)
   const { ground_plane_offset, flip_y, metric_scale_factor } = activeWorld.assets.splats.semantics_metadata

@@ -28,6 +28,17 @@ export const FlyController = forwardRef<FlyControllerHandle>(function FlyControl
   const smoothYaw = useRef(0)
   const smoothPitch = useRef(0)
 
+  const reset = useCallback(() => {
+    camera.position.set(0, 1, 0)
+    cameraFocusTarget.current = null
+    keys.current.clear()
+    rawYaw.current = 0
+    rawPitch.current = 0
+    smoothYaw.current = 0
+    smoothPitch.current = 0
+    camera.quaternion.setFromEuler(_euler.set(0, 0, 0))
+  }, [camera])
+
   const applyDolly = useCallback((deltaY: number) => {
     _dollyForward.set(0, 0, -1).applyQuaternion(camera.quaternion).normalize()
     camera.position.addScaledVector(_dollyForward, -deltaY * DOLLY_UNITS_PER_PIXEL)
@@ -43,14 +54,12 @@ export const FlyController = forwardRef<FlyControllerHandle>(function FlyControl
   useCameraGestures({ domElement: gl.domElement, onDollyPixels: applyDolly, onTumblePixels: applyTumble })
 
   useImperativeHandle(ref, () => ({
-    reset: () => {
-      camera.position.set(0, 1, 0)
-      rawYaw.current = 0
-      rawPitch.current = 0
-      smoothYaw.current = 0
-      smoothPitch.current = 0
-    },
-  }))
+    reset,
+  }), [reset])
+
+  useEffect(() => {
+    reset()
+  }, [reset])
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {

@@ -25,6 +25,7 @@ export interface SceneObjectHandle {
   initialPosition: THREE.Vector3
   initialRotation: THREE.Quaternion
   bounds: THREE.Box3
+  getFocusPoint: (target: THREE.Vector3) => THREE.Vector3
 }
 
 interface Props {
@@ -75,6 +76,7 @@ export const SceneObject = forwardRef<SceneObjectHandle, Props>(function SceneOb
   ref,
 ) {
   const rigidBodyRef = useRef<RapierRigidBody>(null)
+  const colliderProxyRef = useRef<THREE.Mesh>(null)
   const sfxRefs = useRef<Array<THREE.PositionalAudio | null>>([])
   const lastSfxIndexRef = useRef<number | null>(null)
   const muted = useAudioStore((s) => s.muted)
@@ -231,8 +233,12 @@ export const SceneObject = forwardRef<SceneObjectHandle, Props>(function SceneOb
       initialPosition,
       initialRotation,
       bounds,
+      getFocusPoint: (target) => {
+        if (colliderProxyRef.current) return colliderProxyRef.current.getWorldPosition(target)
+        return target.copy(initialPosition).add(colliderCenter)
+      },
     }),
-    [bounds, initialPosition, initialRotation, object.id],
+    [bounds, colliderCenter, initialPosition, initialRotation, object.id],
   )
 
   return (
@@ -252,6 +258,7 @@ export const SceneObject = forwardRef<SceneObjectHandle, Props>(function SceneOb
         position={[colliderCenter.x, colliderCenter.y, colliderCenter.z]}
       />
       <mesh
+        ref={colliderProxyRef}
         position={[colliderCenter.x, colliderCenter.y, colliderCenter.z]}
         material={colliderWireframeMaterial}
         onPointerOver={(event) => {

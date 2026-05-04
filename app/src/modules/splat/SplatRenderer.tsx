@@ -128,7 +128,7 @@ export const SplatRenderer = forwardRef<SplatRendererHandle, Props>(
       },
     }))
 
-    const sparkArgs = useMemo(() => ({ renderer }), [renderer])
+    const sparkArgs = useMemo(() => ({ renderer }), [renderer]) //, maxPixelRadius: 1 
     const splatArgs = useMemo(
       () => ({
         url,

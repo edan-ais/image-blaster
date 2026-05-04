@@ -18,6 +18,7 @@ interface DebugStore {
   objectRenderMode: ObjectRenderMode
   setObjectRenderMode: (v: ObjectRenderMode) => void
   objectResetToken: number
+  controllerResetToken: number
   resetObjects: () => void
   showOrigin: boolean
   setShowOrigin: (v: boolean) => void
@@ -71,22 +72,26 @@ export const useDebugStore = create<DebugStore>()(
       objectRenderMode: ObjectRenderMode.Lit,
       setObjectRenderMode: (objectRenderMode) => set({ objectRenderMode }),
       objectResetToken: 0,
-      resetObjects: () => set((s) => ({ objectResetToken: s.objectResetToken + 1 })),
+      controllerResetToken: 0,
+      resetObjects: () => set((s) => ({
+        objectResetToken: s.objectResetToken + 1,
+        controllerResetToken: s.controllerResetToken + 1,
+      })),
       showOrigin: false,
       setShowOrigin: (showOrigin) => set({ showOrigin }),
-      controllerMode: 'fps',
+      controllerMode: 'fly',
       setControllerMode: (controllerMode) => set({ controllerMode }),
       dofEnabled: true,
       setDofEnabled: (dofEnabled) => set({ dofEnabled }),
-      focalDistance: 10,
+      focalDistance: 5,
       setFocalDistance: (focalDistance) => set({ focalDistance }),
-      apertureAngle: 0.05,
+      apertureAngle: 0.01,
       setApertureAngle: (apertureAngle) => set({ apertureAngle }),
       falloff: 1,
       setFalloff: (falloff) => set({ falloff }),
-      sharpRange: 2.5,
+      sharpRange: 0,
       setSharpRange: (sharpRange) => set({ sharpRange }),
-      falloffRate: 0.01,
+      falloffRate: 0,
       setFalloffRate: (falloffRate) => set({ falloffRate }),
       bloomEnabled: true,
       setBloomEnabled: (bloomEnabled) => set({ bloomEnabled }),
@@ -94,11 +99,11 @@ export const useDebugStore = create<DebugStore>()(
       setBloomIntensity: (bloomIntensity) => set({ bloomIntensity }),
       bloomThreshold: 0.85,
       setBloomThreshold: (bloomThreshold) => set({ bloomThreshold }),
-      chromaticEnabled: false,
+      chromaticEnabled: true,
       setChromaticEnabled: (chromaticEnabled) => set({ chromaticEnabled }),
       chromaticOffset: 0.0008,
       setChromaticOffset: (chromaticOffset) => set({ chromaticOffset }),
-      motionBlurEnabled: true,
+      motionBlurEnabled: false,
       setMotionBlurEnabled: (motionBlurEnabled) => set({ motionBlurEnabled }),
       motionBlurStrength: 0.3,
       setMotionBlurStrength: (motionBlurStrength) => set({ motionBlurStrength }),
@@ -111,14 +116,26 @@ export const useDebugStore = create<DebugStore>()(
     }),
     {
       name: 'image-blaster-debug',
-      version: 5,
-      // Only persist things you'd want sticky across reloads. DoF and Post FX
-      // values are always meant to start fresh from the defaults declared above.
+      version: 6,
+      // Persist user-facing viewer controls so the Leva/debug panel survives reloads.
       partialize: (s) => ({
         viewerQuality: s.viewerQuality,
         worldRenderMode: s.worldRenderMode,
         objectRenderMode: s.objectRenderMode,
         controllerMode: s.controllerMode,
+        dofEnabled: s.dofEnabled,
+        focalDistance: s.focalDistance,
+        apertureAngle: s.apertureAngle,
+        falloff: s.falloff,
+        sharpRange: s.sharpRange,
+        falloffRate: s.falloffRate,
+        bloomEnabled: s.bloomEnabled,
+        bloomIntensity: s.bloomIntensity,
+        bloomThreshold: s.bloomThreshold,
+        chromaticEnabled: s.chromaticEnabled,
+        chromaticOffset: s.chromaticOffset,
+        motionBlurEnabled: s.motionBlurEnabled,
+        motionBlurStrength: s.motionBlurStrength,
       }),
     },
   ),

@@ -19,6 +19,23 @@ const OBJECT_MODES = [
   { mode: ObjectRenderMode.Lit, Icon: GlobeHemisphereEast, label: 'Lit' },
 ] as const
 
+const QUALITY_MODES = [
+  { mode: ViewerQuality.Low, label: 'Low' },
+  { mode: ViewerQuality.Medium, label: 'Med' },
+  { mode: ViewerQuality.High, label: 'High' },
+] as const
+
+const WORLD_MODES = [
+  { mode: WorldRenderMode.Combined, label: 'All' },
+  { mode: WorldRenderMode.SplatOnly, label: 'Scene' },
+  { mode: WorldRenderMode.ObjectOnly, label: 'Objects' },
+] as const
+
+function nextMode<T>(items: readonly { mode: T }[], current: T) {
+  const index = items.findIndex((item) => item.mode === current)
+  return items[(index + 1) % items.length].mode
+}
+
 function ControlTooltip({ content, children }: { content: string; children: ReactElement }) {
   return (
     <Tooltip content={content} delayDuration={0} side="top">
@@ -59,77 +76,72 @@ export function BottomLeftControls() {
   }, [setObjectRenderMode, setWorldRenderMode, setViewerQuality])
 
   const utilBtn =
-    'w-7 h-7 flex items-center justify-center rounded-lg text-white/55 hover:text-white hover:bg-white/10 transition-colors'
+    'w-10 h-10 flex items-center justify-center rounded-xl text-white/60 hover:text-white hover:bg-white/12 transition-colors'
 
   const modeBtn = (active: boolean) =>
-    `w-7 h-7 flex items-center justify-center rounded-md transition-colors ${
+    `w-10 h-10 flex items-center justify-center rounded-lg transition-colors ${
       active ? 'bg-white/15 text-white' : 'text-white/45 hover:text-white/75 hover:bg-white/8'
     }`
+  const pillBtn =
+    'w-24 h-10 flex items-center justify-center gap-1.5 px-3 rounded-xl text-white/80 text-xs font-medium hover:text-white hover:bg-white/8 transition-colors'
+
+  const currentQuality = QUALITY_MODES.find((item) => item.mode === viewerQuality) ?? QUALITY_MODES[0]
+  const currentWorldMode = WORLD_MODES.find((item) => item.mode === worldRenderMode) ?? WORLD_MODES[0]
 
   return (
-    <div className="flex items-center gap-1 px-2 py-1.5 rounded-2xl bg-black/55 backdrop-blur-md ring-1 ring-white/10">
+    <div className="flex items-center gap-1.5 px-3 py-2.5 rounded-3xl bg-black/55 backdrop-blur-md ring-1 ring-white/10">
       {/* utility */}
       <ControlTooltip content={muted ? 'Unmute' : 'Mute'}>
         <button onClick={toggleMuted} className={utilBtn}>
-          {muted ? <SpeakerSlash size={16} weight="fill" /> : <SpeakerHigh size={16} weight="fill" />}
+          {muted ? <SpeakerSlash size={18} weight="fill" /> : <SpeakerHigh size={18} weight="fill" />}
         </button>
       </ControlTooltip>
       <ControlTooltip content="Reset objects">
         <button onClick={resetObjects} className={utilBtn}>
-          <ArrowCounterClockwise size={16} weight="bold" />
+          <ArrowCounterClockwise size={18} weight="bold" />
         </button>
       </ControlTooltip>
 
-      <div className="w-px h-4 bg-white/15 mx-0.5" />
+      <div className="w-px h-6 bg-white/15 mx-1" />
 
       {/* viewer quality */}
-      <ControlTooltip content="Quality">
-        <div className="relative flex items-center gap-1 px-1.5">
-          <FadersHorizontalIcon size={13} weight="regular" className="text-white/45 flex-shrink-0" />
-          <select
-            value={viewerQuality}
-            onChange={(e) => setViewerQuality(e.target.value as ViewerQuality)}
-            className="bg-transparent text-white/80 text-[11px] font-medium border-none outline-none cursor-pointer appearance-none pr-3"
-          >
-            <option value={ViewerQuality.Low}>Low</option>
-            <option value={ViewerQuality.Medium}>Med</option>
-            <option value={ViewerQuality.High}>High</option>
-          </select>
-        </div>
+      <ControlTooltip content="Cycle quality">
+        <button
+          onClick={() => setViewerQuality(nextMode(QUALITY_MODES, viewerQuality))}
+          className={pillBtn}
+        >
+          <FadersHorizontalIcon size={15} weight="regular" className="text-white/45 flex-shrink-0" />
+          <span>{currentQuality.label}</span>
+        </button>
       </ControlTooltip>
 
-      <div className="w-px h-4 bg-white/15 mx-0.5" />
+      <div className="w-px h-6 bg-white/15 mx-1" />
 
       {/* object render mode */}
-      <div className="flex items-center gap-0.5 rounded-xl bg-white/5 px-0.5 py-0.5">
+      <div className="flex items-center gap-1 rounded-2xl bg-white/5 p-1">
         {OBJECT_MODES.map(({ mode, Icon, label }) => (
           <ControlTooltip key={mode} content={label}>
             <button
               onClick={() => setObjectRenderMode(mode)}
               className={modeBtn(objectRenderMode === mode)}
             >
-              <Icon size={15} weight={objectRenderMode === mode ? 'fill' : 'regular'} />
+              <Icon size={17} weight={objectRenderMode === mode ? 'fill' : 'regular'} />
             </button>
           </ControlTooltip>
         ))}
       </div>
 
-      <div className="w-px h-4 bg-white/15 mx-0.5" />
+      <div className="w-px h-6 bg-white/15 mx-1" />
 
       {/* world render mode */}
-      <ControlTooltip content="World render mode">
-        <div className="relative flex items-center gap-1 px-1.5">
-          <GlobeSimple size={13} weight="regular" className="text-white/45 flex-shrink-0" />
-          <select
-            value={worldRenderMode}
-            onChange={(e) => setWorldRenderMode(e.target.value as WorldRenderMode)}
-            className="bg-transparent text-white/80 text-[11px] font-medium border-none outline-none cursor-pointer appearance-none pr-3"
-          >
-            <option value={WorldRenderMode.Combined}>All</option>
-            <option value={WorldRenderMode.SplatOnly}>Scene</option>
-            <option value={WorldRenderMode.ObjectOnly}>Objects</option>
-          </select>
-        </div>
+      <ControlTooltip content="Cycle world render mode">
+        <button
+          onClick={() => setWorldRenderMode(nextMode(WORLD_MODES, worldRenderMode))}
+          className={pillBtn}
+        >
+          <GlobeSimple size={15} weight="regular" className="text-white/45 flex-shrink-0" />
+          <span>{currentWorldMode.label}</span>
+        </button>
       </ControlTooltip>
     </div>
   )
