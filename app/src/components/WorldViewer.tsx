@@ -1,4 +1,4 @@
-import { Suspense, useRef, useEffect } from 'react'
+import { Component, Suspense, useRef, useEffect, type ReactNode } from 'react'
 import { Canvas } from '@react-three/fiber'
 import { Physics } from '@react-three/rapier'
 import { SplatRenderer } from '../modules/splat/SplatRenderer'
@@ -18,6 +18,60 @@ import { useDebugStore } from '../store/debug'
 import { WorldRenderMode, ObjectRenderMode, ViewerQuality, type World, type WorldObjectAsset, type WorldSceneProject } from '../types/world'
 
 type CharHandle = CharacterControllerHandle | FlyControllerHandle
+const DEFAULT_ENVIRONMENT_URL = '/hdri.jpg'
+
+interface OptionalAssetBoundaryProps {
+  label: string
+  resetKey: string
+  fallback?: ReactNode
+  children: ReactNode
+}
+
+interface OptionalAssetBoundaryState {
+  hasError: boolean
+}
+
+class OptionalAssetBoundary extends Component<OptionalAssetBoundaryProps, OptionalAssetBoundaryState> {
+  state: OptionalAssetBoundaryState = { hasError: false }
+
+  static getDerivedStateFromError(): OptionalAssetBoundaryState {
+    return { hasError: true }
+  }
+
+  componentDidCatch(error: unknown) {
+    console.warn(`Skipping optional world asset "${this.props.label}" because it failed to load.`, error)
+  }
+
+  componentDidUpdate(prevProps: OptionalAssetBoundaryProps) {
+    if (prevProps.resetKey !== this.props.resetKey && this.state.hasError) {
+      this.setState({ hasError: false })
+    }
+  }
+
+  render() {
+    if (this.state.hasError) return this.props.fallback ?? null
+    return this.props.children
+  }
+}
+
+function GrayEnvironmentFallback() {
+  return (
+    <>
+      <color attach="background" args={['#6b7280']} />
+      <ambientLight color="#ffffff" intensity={0.9} />
+    </>
+  )
+}
+
+function DefaultEnvironment({ intensity }: { intensity: number }) {
+  return (
+    <OptionalAssetBoundary label={DEFAULT_ENVIRONMENT_URL} resetKey={DEFAULT_ENVIRONMENT_URL} fallback={<GrayEnvironmentFallback />}>
+      <Suspense fallback={null}>
+        <EnvironmentMap panoUrl={DEFAULT_ENVIRONMENT_URL} intensity={intensity} />
+      </Suspense>
+    </OptionalAssetBoundary>
+  )
+}
 
 interface Props {
   world: World
@@ -101,12 +155,12 @@ export function WorldViewer({
             ) : (
               <CharacterController ref={charRef as React.RefObject<CharacterControllerHandle>} />
             )}
-            {showScene && (
-              <Suspense fallback={null}>
-                {colliderUrl && (
+            {showScene && colliderUrl && (
+              <OptionalAssetBoundary label={colliderUrl} resetKey={colliderUrl}>
+                <Suspense fallback={null}>
                   <WorldCollider url={colliderUrl} flipY={flipY} groundPlaneOffset={ground_plane_offset} metricScaleFactor={metric_scale_factor} />
-                )}
-              </Suspense>
+                </Suspense>
+              </OptionalAssetBoundary>
             )}
             {showObjects && !editing && (
               <Suspense fallback={null}>
@@ -121,13 +175,15 @@ export function WorldViewer({
             <GroundPlane />
           </Physics>
           {splatUrl && (
-            <SplatRenderer
-              url={splatUrl}
-              visible={showSplat}
-              groundPlaneOffset={ground_plane_offset}
-              flipY={flipY}
-              metricScaleFactor={metric_scale_factor}
-            />
+            <OptionalAssetBoundary label={splatUrl} resetKey={splatUrl}>
+              <SplatRenderer
+                url={splatUrl}
+                visible={showSplat}
+                groundPlaneOffset={ground_plane_offset}
+                flipY={flipY}
+                metricScaleFactor={metric_scale_factor}
+              />
+            </OptionalAssetBoundary>
           )}
           <directionalLight
             castShadow={isHighQuality}
@@ -143,10 +199,13 @@ export function WorldViewer({
             shadow-camera-bottom={-20}
           />
           {panoUrl && (
-            <Suspense fallback={null}>
-              <EnvironmentMap panoUrl={panoUrl} intensity={environmentIntensity} />
-            </Suspense>
+            <OptionalAssetBoundary label={panoUrl} resetKey={panoUrl} fallback={<DefaultEnvironment intensity={environmentIntensity} />}>
+              <Suspense fallback={null}>
+                <EnvironmentMap panoUrl={panoUrl} intensity={environmentIntensity} />
+              </Suspense>
+            </OptionalAssetBoundary>
           )}
+          {!panoUrl && <DefaultEnvironment intensity={environmentIntensity} />}
           {butterfliesEnabled && <ButterflyScene />}
           <OriginHelper />
           {isHighQuality && <PostProcessing />}
