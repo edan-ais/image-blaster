@@ -46,6 +46,8 @@ Run the generator and wait for it to finish:
 node .claude/scripts/asset-pipeline/generate-single-asset.mjs --world "$0" --object-id "<object-id>"
 ```
 
+For iterative refinement, pass `--reference-only` to stop after the image-edit step. The script returns the reference image path and exits without calling the 3D provider. Inspect the reference (e.g. via `show-path.mjs --reveal`), and when the reference looks faithful to the source, call the script again without `--reference-only` to run only the 3D step from the existing reference.
+
 If request metadata records provider URLs but local model or image files are missing, fill them from the matching hidden request JSON:
 
 ```bash

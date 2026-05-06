@@ -79,6 +79,12 @@ node .claude/scripts/project/show-path.mjs --reveal worlds/<world-slug>/source/0
 
 Use `--reveal` when the user should see the file selected in its containing folder instead of opening the file directly. This helper requires the file or folder to already exist and also prints a fallback command.
 
+## Don't Load Images Into Your Context
+
+Don't `Read` generated PNG/JPG/WEBP files just to inspect or QC them. Use `node .claude/scripts/project/show-path.mjs --reveal <path>` when the user should see an image.
+
+Trust script output, indexed filenames, and JSON sidecars for what generated. Only load images into context when multimodal source-image analysis is the task.
+
 ## Generation Scripts Are Synchronous
 
 All generation scripts (`generate-edit.mjs`, `generate-world.mjs`, `generate-single-asset.mjs`, `fal-elevenlabs-sfx.mjs`, etc.) block until the API call completes and print their result to stdout. **Never** run them with `run_in_background: true` or use `tail -f` to monitor their output — just run them directly and read the printed result.

@@ -113,16 +113,9 @@ function buildDirectObject({ objectId, objectName, description, image, world }) 
 }
 
 function buildPrompt(object) {
-  return `Create a single clean reference image for this object only:
-
-Name: ${object.name}
-Description: ${object.description}
-
-Requirements:
-- show only this object, no surrounding scene and no extra props
-- white background, studio lighting, centered composition
-- cropped tightly while keeping the entire object visible
-- no text, labels, hands, people, floor shadows, or duplicate objects`;
+  const location = object.evidence?.[0]?.location_in_image;
+  const where = location ? ` (${location})` : "";
+  return `Isolate the ${object.name}${where} from this image. Reproduce it exactly as shown — same colors, materials, proportions, count, and accessories. White background, centered, tight crop, studio lighting. No other objects, no scene, no people, no text, no shadows on the ground.`;
 }
 
 function resolve3DProvider(value = DEFAULT_3D_PROVIDER) {
@@ -380,7 +373,8 @@ export async function generateSingleObject(options) {
     meshyEnableSafetyChecker = DEFAULT_MESHY_ENABLE_SAFETY_CHECKER,
     meshyEnableAnimation = DEFAULT_MESHY_ENABLE_ANIMATION,
     meshyEnableRigging = DEFAULT_MESHY_ENABLE_RIGGING,
-    meshyEnablePbr = DEFAULT_MESHY_ENABLE_PBR
+    meshyEnablePbr = DEFAULT_MESHY_ENABLE_PBR,
+    referenceOnly = false
   } = options;
 
   if (!world) throw new Error("world is required.");
@@ -492,6 +486,19 @@ export async function generateSingleObject(options) {
       });
     }
 
+    if (referenceOnly) {
+      return {
+        schema_version: 1,
+        world,
+        object,
+        object_json: resolved.objectJsonPath,
+        output_dir: resolved.objectDir,
+        reference_only: true,
+        reference_image: generatedImagePath,
+        request_metadata: [imageMetadataPath].filter(Boolean)
+      };
+    }
+
     const currentModel = regenerate ? undefined : await latestArtifact(resolved.objectDir, object.id, MODEL_EXTENSIONS);
     if (!currentModel || activeModelRequest) {
       const modelRequest =
@@ -581,7 +588,7 @@ async function main() {
 
   if (!world || (!objectId && !directImage)) {
     throw new Error(
-      "Usage: node generate-single-asset.mjs --world <world-name> (--object-id <object-id> | --image <path>) [--object-name <name>] [--description <text>] [--provider hunyuan|meshy] [--regenerate] [--face-count <40000-1500000>] [--target-polycount 30000] [--enable-pbr true|false]"
+      "Usage: node generate-single-asset.mjs --world <world-name> (--object-id <object-id> | --image <path>) [--object-name <name>] [--description <text>] [--provider hunyuan|meshy] [--regenerate] [--reference-only] [--face-count <40000-1500000>] [--target-polycount 30000] [--enable-pbr true|false]"
     );
   }
 
@@ -592,6 +599,7 @@ async function main() {
     objectName: one(flags, "object-name") || one(flags, "asset-name"),
     description: one(flags, "description"),
     regenerate: Boolean(flags.regenerate),
+    referenceOnly: Boolean(flags["reference-only"]),
     imageEditProvider: one(flags, "image-edit-provider"),
     modelProvider: one(flags, "provider") || one(flags, "3d-provider") || one(flags, "model-provider"),
     hunyuanFaceCount: one(flags, "face-count", DEFAULT_HUNYUAN_FACE_COUNT),

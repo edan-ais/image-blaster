@@ -23,10 +23,12 @@ import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js'
 import { clone as cloneSkeleton } from 'three/examples/jsm/utils/SkeletonUtils.js'
 import { AppButton } from '../../components/AppButton'
 import { ChromePanel, ChromeThumbnail, chrome } from '../../components/AppChrome'
-import { ObjectRenderMode, type WorldObjectAsset, type WorldObjectPhysics, type WorldObjectPlacement, type WorldSceneProject } from '../../types/world'
+import { ObjectRenderMode, type WorldObjectAsset, type WorldObjectPhysics, type WorldObjectPlacement, type WorldSceneProject, type WorldSceneSun } from '../../types/world'
 import { OBJECT_SCALE } from './SceneObject'
 import { getInitialPlacements } from './placements'
 import { DROP_TARGET_LAYER } from './dropTargets'
+import { useAssetMaterials, SHADED_COLOR, HOVER_DIM_FACTOR } from './useAssetMaterials'
+import { isEditableTarget } from '../../utils/dom'
 
 export type TransformMode = 'translate' | 'rotate' | 'scale'
 type TransformField = 'position' | 'rotation' | 'scale'
@@ -37,6 +39,7 @@ interface EditorStateArgs {
   objects: WorldObjectAsset[]
   allObjectAssets: WorldObjectAsset[]
   sceneProject?: WorldSceneProject
+  baseMetricScaleFactor: number
   sceneProjectReady: boolean
   editing: boolean
   onProjectSaved?: (project: WorldSceneProject) => void
@@ -58,6 +61,12 @@ interface PlacementEditorSceneProps {
 
 interface PlacementEditorOverlayProps {
   controller: PlacementEditorController
+}
+
+interface MeshMaterialState {
+  mesh: THREE.Mesh
+  litMaterials: THREE.Material | THREE.Material[]
+  colorEntries: Array<{ material: THREE.Material & { color: THREE.Color }; baseColor: THREE.Color }>
 }
 
 export interface PlacementEditorController {
@@ -90,6 +99,13 @@ export interface PlacementEditorController {
   setDropSelectedToFloorHandler: (handler: (() => void) | null) => void
   updateSelectedTransform: (field: TransformField, axis: TransformAxis, value: number) => void
   updateSelectedPhysics: (physics: WorldObjectPhysics) => void
+  sun: WorldSceneSun
+  updateSunIntensity: (intensity: number) => void
+  updateEnvironmentIntensity: (intensity: number) => void
+  updateSunRotation: (axis: TransformAxis, value: number) => void
+  metricScaleFactor: number
+  resetMetricScaleFactor: () => void
+  updateMetricScaleFactor: (metricScaleFactor: number) => void
   undo: () => void
   redo: () => void
   resetEdits: () => void
@@ -102,6 +118,7 @@ const HISTORY_LIMIT = 80
 const PASTE_OFFSET: [number, number, number] = [0.25, 0, 0.25]
 const ROTATION_SNAP_DEGREES = 5
 const projectVersion = 1
+const DEFAULT_SCENE_SUN: WorldSceneSun = { intensity: 1, rotation: [0, 0, 0], environmentIntensity: 2 }
 const ignoreRaycast: THREE.Object3D['raycast'] = () => {}
 const TRANSFORM_FIELDS: Array<{ field: TransformField; label: string; step: number }> = [
   { field: 'position', label: 'Pos', step: 0.01 },
@@ -124,8 +141,29 @@ function clonePlacements(instances: WorldObjectPlacement[]): WorldObjectPlacemen
   }))
 }
 
-function signature(instances: WorldObjectPlacement[]) {
-  return JSON.stringify(instances)
+function cloneSun(sun: WorldSceneSun = DEFAULT_SCENE_SUN): WorldSceneSun {
+  return {
+    intensity: sun.intensity,
+    rotation: [...sun.rotation],
+    environmentIntensity: sun.environmentIntensity ?? DEFAULT_SCENE_SUN.environmentIntensity,
+  }
+}
+
+function cloneMaterial(material: THREE.Material | THREE.Material[]): THREE.Material | THREE.Material[] {
+  if (Array.isArray(material)) return material.map((m) => m.clone())
+  return material.clone()
+}
+
+function asMaterialArray(material: THREE.Material | THREE.Material[]) {
+  return Array.isArray(material) ? material : [material]
+}
+
+function hasColor(material: THREE.Material): material is THREE.Material & { color: THREE.Color } {
+  return 'color' in material && material.color instanceof THREE.Color
+}
+
+function signature(value: unknown) {
+  return JSON.stringify(value)
 }
 
 function asTuple(vector: THREE.Vector3): [number, number, number] {
@@ -166,30 +204,93 @@ function EditableObject({
 }: EditableObjectProps) {
   const [hovered, setHovered] = useState(false)
   const gltf = useLoader(GLTFLoader, asset.url)
-  const { scene, offset, size } = useMemo(() => {
+  const { wireframeMaterial, shadedMaterial, wireframeOverlayMaterial } = useAssetMaterials()
+  const { scene, wireframeOverlayScene, offset, size, materialStates } = useMemo(() => {
     const clonedScene = cloneSkeleton(gltf.scene)
+    const overlayScene = cloneSkeleton(gltf.scene)
+    const states: MeshMaterialState[] = []
+
+    clonedScene.traverse((child) => {
+      if (!(child instanceof THREE.Mesh)) return
+      child.castShadow = true
+      child.receiveShadow = false
+      child.raycast = ignoreRaycast
+
+      const litMaterials = cloneMaterial(child.material)
+      child.material = litMaterials
+      const colorEntries = asMaterialArray(litMaterials)
+        .filter(hasColor)
+        .map((material) => ({
+          material,
+          baseColor: material.color.clone(),
+        }))
+
+      states.push({ mesh: child, litMaterials, colorEntries })
+    })
+
     const box = new THREE.Box3().setFromObject(clonedScene)
     const center = new THREE.Vector3()
     const size = new THREE.Vector3()
     box.getCenter(center)
     box.getSize(size)
 
-    clonedScene.traverse((child) => {
+    overlayScene.traverse((child) => {
       if (!(child instanceof THREE.Mesh)) return
-      child.castShadow = true
-      child.receiveShadow = true
       child.raycast = ignoreRaycast
-      if (renderMode === ObjectRenderMode.Wireframe) {
-        child.material = new THREE.MeshBasicMaterial({ color: 0xffffff, wireframe: true })
-      }
     })
 
     return {
       scene: clonedScene,
+      wireframeOverlayScene: overlayScene,
       offset: new THREE.Vector3(-center.x, -box.min.y, -center.z),
       size,
+      materialStates: states,
     }
-  }, [gltf.scene, renderMode])
+  }, [gltf.scene])
+
+  useEffect(() => {
+    wireframeOverlayScene.traverse((child) => {
+      if (!(child instanceof THREE.Mesh)) return
+      child.material = wireframeOverlayMaterial
+      child.renderOrder = 1
+      child.raycast = ignoreRaycast
+    })
+  }, [wireframeOverlayMaterial, wireframeOverlayScene])
+
+  useEffect(() => {
+    if (renderMode === ObjectRenderMode.ShadedWireframe) {
+      shadedMaterial.color.copy(SHADED_COLOR)
+      if (hovered || selected) shadedMaterial.color.multiplyScalar(HOVER_DIM_FACTOR)
+    }
+
+    for (const state of materialStates) {
+      if (renderMode === ObjectRenderMode.Wireframe) {
+        state.mesh.material = wireframeMaterial
+        continue
+      }
+
+      if (renderMode === ObjectRenderMode.ShadedWireframe) {
+        state.mesh.material = shadedMaterial
+        continue
+      }
+
+      state.mesh.material = state.litMaterials
+      for (const { material, baseColor } of state.colorEntries) {
+        material.color.copy(baseColor)
+        if (hovered || selected) material.color.multiplyScalar(HOVER_DIM_FACTOR)
+      }
+    }
+  }, [hovered, materialStates, renderMode, selected, shadedMaterial, wireframeMaterial])
+
+  useEffect(() => {
+    return () => {
+      for (const state of materialStates) {
+        for (const material of asMaterialArray(state.litMaterials)) {
+          material.dispose()
+        }
+      }
+    }
+  }, [materialStates])
 
   return (
     <group
@@ -200,10 +301,12 @@ function EditableObject({
     >
       <group scale={OBJECT_SCALE}>
         <primitive object={scene} position={offset} dispose={null} />
+        {renderMode === ObjectRenderMode.ShadedWireframe && (
+          <primitive object={wireframeOverlayScene} position={offset} dispose={null} />
+        )}
       </group>
       <mesh
         position={[0, Math.max(size.y * OBJECT_SCALE, 0.01) / 2, 0]}
-        renderOrder={10000}
         onPointerOver={(event) => {
           event.stopPropagation()
           setHovered(true)
@@ -222,10 +325,10 @@ function EditableObject({
         <meshBasicMaterial
           color={selected ? 0x7dd3fc : 0xffffff}
           wireframe
-          transparent
+          transparent={!selected && !hovered}
           opacity={selected || hovered ? 1 : 0}
-          depthTest={false}
-          depthWrite={false}
+          depthTest
+          depthWrite={selected || hovered}
           toneMapped={false}
         />
       </mesh>
@@ -251,17 +354,121 @@ function snapTransformInputValue(field: TransformField, value: number) {
   return Math.round(value / ROTATION_SNAP_DEGREES) * ROTATION_SNAP_DEGREES
 }
 
+function TransformValueInput({
+  field,
+  axis,
+  step,
+  value,
+  onChange,
+}: {
+  field: TransformField
+  axis: TransformAxis
+  step: number
+  value: number
+  onChange: (field: TransformField, axis: TransformAxis, value: number) => void
+}) {
+  const displayValue = transformInputValue(field, value)
+  const [draft, setDraft] = useState(displayValue)
+  const [focused, setFocused] = useState(false)
+
+  useEffect(() => {
+    if (!focused) setDraft(displayValue)
+  }, [displayValue, focused])
+
+  return (
+    <input
+      type="number"
+      step={step}
+      value={draft}
+      onFocus={() => setFocused(true)}
+      onChange={(event) => {
+        const next = event.currentTarget.value
+        setDraft(next)
+        const parsed = Number.parseFloat(next)
+        if (Number.isFinite(parsed)) onChange(field, axis, transformPlacementValue(field, parsed))
+      }}
+      onBlur={() => {
+        setFocused(false)
+        const parsed = Number.parseFloat(draft)
+        if (!Number.isFinite(parsed)) {
+          setDraft(displayValue)
+          return
+        }
+        const snapped = snapTransformInputValue(field, parsed)
+        setDraft(formatTransformValue(snapped))
+        onChange(field, axis, transformPlacementValue(field, snapped))
+      }}
+      className="h-7 w-full rounded border border-white/10 bg-black/40 px-1.5 text-right text-xs text-white/85"
+    />
+  )
+}
+
+function NumberValueInput({
+  value,
+  step,
+  displayValue = value,
+  onChange,
+  toStoredValue = (next) => next,
+  className = '',
+}: {
+  value: number
+  step: number
+  displayValue?: number
+  onChange: (value: number) => void
+  toStoredValue?: (value: number) => number
+  className?: string
+}) {
+  const formattedValue = formatTransformValue(displayValue)
+  const [draft, setDraft] = useState(formattedValue)
+  const [focused, setFocused] = useState(false)
+
+  useEffect(() => {
+    const parsedDraft = Number.parseFloat(draft)
+    if (!focused || !Number.isFinite(parsedDraft) || parsedDraft !== displayValue) {
+      setDraft(formattedValue)
+    }
+  }, [displayValue, draft, focused, formattedValue])
+
+  return (
+    <input
+      type="number"
+      step={step}
+      value={draft}
+      onFocus={() => setFocused(true)}
+      onChange={(event) => {
+        const next = event.currentTarget.value
+        setDraft(next)
+        const parsed = Number.parseFloat(next)
+        if (Number.isFinite(parsed)) onChange(toStoredValue(parsed))
+      }}
+      onBlur={() => {
+        setFocused(false)
+        const parsed = Number.parseFloat(draft)
+        if (!Number.isFinite(parsed)) {
+          setDraft(formattedValue)
+          return
+        }
+        setDraft(formatTransformValue(parsed))
+        onChange(toStoredValue(parsed))
+      }}
+      className={`h-7 w-full rounded border border-white/10 bg-black/40 px-1.5 text-right text-xs text-white/85 ${className}`}
+    />
+  )
+}
+
 function blurEditableTarget(target: EventTarget | null) {
-  if (!(target instanceof HTMLInputElement || target instanceof HTMLTextAreaElement || target instanceof HTMLSelectElement)) return false
+  if (!(target instanceof HTMLElement) || !isEditableTarget(target)) return false
   target.blur()
   return true
 }
 
-export function usePlacementEditor({ slug, objects, allObjectAssets, sceneProject, sceneProjectReady, editing, onProjectSaved }: EditorStateArgs): PlacementEditorController {
+export function usePlacementEditor({ slug, objects, allObjectAssets, sceneProject, baseMetricScaleFactor, sceneProjectReady, editing, onProjectSaved }: EditorStateArgs): PlacementEditorController {
   const initialPlacements = useMemo(
     () => getInitialPlacements(objects, sceneProject?.instances),
     [objects, sceneProject],
   )
+  const initialSun = useMemo(() => cloneSun(sceneProject?.sun), [sceneProject])
+  const initialMetricScaleFactor = sceneProject?.metricScaleFactor ?? baseMetricScaleFactor
   const [assetFilter, setAssetFilter] = useState<'world' | 'all'>('world')
   const visibleAssetLibrary = assetFilter === 'world'
     ? allObjectAssets.filter((asset) => asset.sourceWorldSlug === slug)
@@ -273,6 +480,8 @@ export function usePlacementEditor({ slug, objects, allObjectAssets, sceneProjec
     return map
   }, [allObjectAssets, objects])
   const [instances, setInstances] = useState(() => clonePlacements(initialPlacements))
+  const [sun, setSun] = useState(() => cloneSun(initialSun))
+  const [metricScaleFactor, setMetricScaleFactor] = useState(initialMetricScaleFactor)
   const [selectedId, setSelectedId] = useState<string | null>(null)
   const [mode, setMode] = useState<TransformMode>('translate')
   const [saveStatus, setSaveStatus] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle')
@@ -281,6 +490,8 @@ export function usePlacementEditor({ slug, objects, allObjectAssets, sceneProjec
   const loadedSlugRef = useRef(slug)
   const selectedIdRef = useRef(selectedId)
   const instancesRef = useRef(instances)
+  const sunRef = useRef(sun)
+  const metricScaleFactorRef = useRef(metricScaleFactor)
   const dropSelectedToFloorHandlerRef = useRef<(() => void) | null>(null)
   const flushSelectedTransformHandlerRef = useRef<(() => WorldObjectPlacement[] | null) | null>(null)
 
@@ -288,12 +499,16 @@ export function usePlacementEditor({ slug, objects, allObjectAssets, sceneProjec
     () => instances.find((instance) => instance.instanceId === selectedId),
     [instances, selectedId],
   )
-  const dirty = signature(instances) !== signature(initialPlacements)
+  const dirty = signature(instances) !== signature(initialPlacements) ||
+    signature(sun) !== signature(initialSun) ||
+    metricScaleFactor !== initialMetricScaleFactor
   const canUndo = historyRef.current.past.length > 0
   const canRedo = historyRef.current.future.length > 0
 
   instancesRef.current = instances
   selectedIdRef.current = selectedId
+  sunRef.current = sun
+  metricScaleFactorRef.current = metricScaleFactor
 
   const pushHistory = useCallback((snapshot: WorldObjectPlacement[]) => {
     historyRef.current.past = [...historyRef.current.past, clonePlacements(snapshot)].slice(-HISTORY_LIMIT)
@@ -313,15 +528,23 @@ export function usePlacementEditor({ slug, objects, allObjectAssets, sceneProjec
   useEffect(() => {
     const next = clonePlacements(initialPlacements)
     const nextSignature = signature(next)
-    if (loadedSlugRef.current === slug && nextSignature === signature(instancesRef.current)) {
+    const nextSun = cloneSun(initialSun)
+    if (
+      loadedSlugRef.current === slug &&
+      nextSignature === signature(instancesRef.current) &&
+      signature(nextSun) === signature(sunRef.current) &&
+      initialMetricScaleFactor === metricScaleFactorRef.current
+    ) {
       return
     }
     loadedSlugRef.current = slug
     setInstances(next)
+    setSun(nextSun)
+    setMetricScaleFactor(initialMetricScaleFactor)
     setSelectedId(null)
     historyRef.current = { past: [], future: [] }
     setSaveStatus('idle')
-  }, [initialPlacements, slug])
+  }, [initialMetricScaleFactor, initialPlacements, initialSun, slug])
 
   const commitInstances = useCallback((next: WorldObjectPlacement[]) => {
     if (signature(next) === signature(instancesRef.current)) return
@@ -448,6 +671,48 @@ export function usePlacementEditor({ slug, objects, allObjectAssets, sceneProjec
     )))
   }, [updateInstances])
 
+  const updateSunIntensity = useCallback((intensity: number) => {
+    if (!Number.isFinite(intensity)) return
+    setSun((current) => {
+      if (current.intensity === intensity) return current
+      setSaveStatus('idle')
+      return { ...current, intensity }
+    })
+  }, [])
+
+  const updateEnvironmentIntensity = useCallback((environmentIntensity: number) => {
+    if (!Number.isFinite(environmentIntensity)) return
+    setSun((current) => {
+      if (current.environmentIntensity === environmentIntensity) return current
+      setSaveStatus('idle')
+      return { ...current, environmentIntensity }
+    })
+  }, [])
+
+  const updateSunRotation = useCallback((axis: TransformAxis, value: number) => {
+    if (!Number.isFinite(value)) return
+    setSun((current) => {
+      if (current.rotation[axis] === value) return current
+      const rotation = [...current.rotation] as [number, number, number]
+      rotation[axis] = value
+      setSaveStatus('idle')
+      return { ...current, rotation }
+    })
+  }, [])
+
+  const updateMetricScaleFactor = useCallback((nextMetricScaleFactor: number) => {
+    if (!Number.isFinite(nextMetricScaleFactor) || nextMetricScaleFactor <= 0) return
+    setMetricScaleFactor((current) => {
+      if (current === nextMetricScaleFactor) return current
+      setSaveStatus('idle')
+      return nextMetricScaleFactor
+    })
+  }, [])
+
+  const resetMetricScaleFactor = useCallback(() => {
+    updateMetricScaleFactor(baseMetricScaleFactor)
+  }, [baseMetricScaleFactor, updateMetricScaleFactor])
+
   const undo = useCallback(() => {
     const snapshot = historyRef.current.past[historyRef.current.past.length - 1]
     if (!snapshot) return
@@ -468,8 +733,10 @@ export function usePlacementEditor({ slug, objects, allObjectAssets, sceneProjec
 
   const resetEdits = useCallback(() => {
     updateInstances(() => clonePlacements(initialPlacements))
+    setSun(cloneSun(initialSun))
+    setMetricScaleFactor(initialMetricScaleFactor)
     setSelectedId(null)
-  }, [initialPlacements, updateInstances])
+  }, [initialMetricScaleFactor, initialPlacements, initialSun, updateInstances])
 
   const openWorldFolder = useCallback(() => {
     if (!import.meta.env.DEV) return
@@ -482,7 +749,12 @@ export function usePlacementEditor({ slug, objects, allObjectAssets, sceneProjec
     if (!import.meta.env.DEV) return true
     try {
       const flushedInstances = flushSelectedTransformHandlerRef.current?.()
-      const project: WorldSceneProject = { version: projectVersion, instances: clonePlacements(flushedInstances ?? instancesRef.current) }
+      const project: WorldSceneProject = {
+        version: projectVersion,
+        instances: clonePlacements(flushedInstances ?? instancesRef.current),
+        sun: cloneSun(sunRef.current),
+        metricScaleFactor: metricScaleFactorRef.current,
+      }
       setSaveStatus('saving')
       const response = await fetch(`/__scene-project?slug=${encodeURIComponent(slug)}`, {
         method: 'POST',
@@ -492,6 +764,8 @@ export function usePlacementEditor({ slug, objects, allObjectAssets, sceneProjec
       if (!response.ok) throw new Error(await response.text())
       const savedProject = await response.json() as WorldSceneProject
       setInstances(clonePlacements(savedProject.instances))
+      setSun(cloneSun(savedProject.sun))
+      setMetricScaleFactor(savedProject.metricScaleFactor ?? baseMetricScaleFactor)
       onProjectSaved?.(savedProject)
       setSaveStatus('saved')
       return true
@@ -500,11 +774,16 @@ export function usePlacementEditor({ slug, objects, allObjectAssets, sceneProjec
       setSaveStatus('error')
       return false
     }
-  }, [onProjectSaved, slug])
+  }, [baseMetricScaleFactor, onProjectSaved, slug])
 
   useEffect(() => {
     if (!editing || !sceneProjectReady || sceneProject || !objects.length || !import.meta.env.DEV) return
-    const project: WorldSceneProject = { version: projectVersion, instances: clonePlacements(initialPlacements) }
+    const project: WorldSceneProject = {
+      version: projectVersion,
+      instances: clonePlacements(initialPlacements),
+      sun: cloneSun(initialSun),
+      metricScaleFactor: initialMetricScaleFactor,
+    }
     fetch(`/__scene-project?slug=${encodeURIComponent(slug)}`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -518,7 +797,7 @@ export function usePlacementEditor({ slug, objects, allObjectAssets, sceneProjec
       .catch((error) => {
         console.warn('Failed to initialize scene project.', error)
       })
-  }, [editing, initialPlacements, objects.length, onProjectSaved, sceneProject, sceneProjectReady, slug])
+  }, [editing, initialMetricScaleFactor, initialPlacements, initialSun, objects.length, onProjectSaved, sceneProject, sceneProjectReady, slug])
 
   useEffect(() => {
     if (!editing || !dirty) return
@@ -534,11 +813,11 @@ export function usePlacementEditor({ slug, objects, allObjectAssets, sceneProjec
     if (!editing) return
     const onKeyDown = (event: KeyboardEvent) => {
       const target = event.target
-      if (target instanceof HTMLInputElement || target instanceof HTMLTextAreaElement || target instanceof HTMLSelectElement) {
+      if (isEditableTarget(target)) {
         if (event.key === 'Escape') {
           event.preventDefault()
           event.stopPropagation()
-          target.blur()
+          if (target instanceof HTMLElement) target.blur()
         }
         return
       }
@@ -618,6 +897,13 @@ export function usePlacementEditor({ slug, objects, allObjectAssets, sceneProjec
     setDropSelectedToFloorHandler,
     updateSelectedTransform,
     updateSelectedPhysics,
+    sun,
+    updateSunIntensity,
+    updateEnvironmentIntensity,
+    updateSunRotation,
+    metricScaleFactor,
+    resetMetricScaleFactor,
+    updateMetricScaleFactor,
     undo,
     redo,
     resetEdits,
@@ -631,6 +917,8 @@ export function PlacementEditorScene({ controller, renderMode }: PlacementEditor
   const { scene } = useThree()
   const transformRef = useRef<any>(null)
   const selectedObjectRef = useRef<THREE.Group>(null)
+  const selectionSuppressedRef = useRef(false)
+  const selectionSuppressionTimeoutRef = useRef<number | undefined>(undefined)
   const [selectedObject, setSelectedObject] = useState<THREE.Group>()
   const dragStartRef = useRef<WorldObjectPlacement | null>(null)
   const raycasterRef = useRef(new THREE.Raycaster())
@@ -670,18 +958,41 @@ export function PlacementEditorScene({ controller, renderMode }: PlacementEditor
     const controls = transformRef.current as any
     if (!controls) return
     const captureDragStart = () => {
+      selectionSuppressedRef.current = true
+      if (selectionSuppressionTimeoutRef.current !== undefined) {
+        window.clearTimeout(selectionSuppressionTimeoutRef.current)
+        selectionSuppressionTimeoutRef.current = undefined
+      }
       dragStartRef.current = controller.selectedInstance ? clonePlacements([controller.selectedInstance])[0] : null
     }
     const bakeDragEnd = (event: { value?: boolean }) => {
-      if (event.value === false) bakeSelectedTransform()
+      if (event.value !== false) return
+      bakeSelectedTransform()
+      selectionSuppressionTimeoutRef.current = window.setTimeout(() => {
+        selectionSuppressedRef.current = false
+        selectionSuppressionTimeoutRef.current = undefined
+      }, 120)
     }
     controls.addEventListener('mouseDown', captureDragStart)
     controls.addEventListener('dragging-changed', bakeDragEnd)
     return () => {
+      if (selectionSuppressionTimeoutRef.current !== undefined) {
+        window.clearTimeout(selectionSuppressionTimeoutRef.current)
+        selectionSuppressionTimeoutRef.current = undefined
+      }
+      selectionSuppressedRef.current = false
       controls.removeEventListener('mouseDown', captureDragStart)
       controls.removeEventListener('dragging-changed', bakeDragEnd)
     }
   }, [bakeSelectedTransform, controller.selectedInstance])
+
+  const selectInstance = useCallback((event: ThreeEvent<MouseEvent>, instanceId: string) => {
+    if (selectionSuppressedRef.current) {
+      event.stopPropagation()
+      return
+    }
+    controller.selectInstance(event, instanceId)
+  }, [controller])
 
   useEffect(() => {
     controller.setFlushSelectedTransformHandler(bakeSelectedTransform)
@@ -731,7 +1042,15 @@ export function PlacementEditorScene({ controller, renderMode }: PlacementEditor
       }
       return false
     }
-    const origin = new THREE.Vector3(...selected.position).add(new THREE.Vector3(0, 50, 0))
+    const origin = new THREE.Vector3(...selected.position)
+    if (selectedGroup) {
+      selectedGroup.updateWorldMatrix(true, true)
+      const bounds = new THREE.Box3().setFromObject(selectedGroup)
+      selectedGroup.getWorldPosition(origin)
+      origin.y = bounds.max.y + 0.25
+    } else {
+      origin.y += 0.25
+    }
     const raycaster = raycasterRef.current
     raycaster.layers.set(DROP_TARGET_LAYER)
     raycaster.set(origin, new THREE.Vector3(0, -1, 0))
@@ -765,7 +1084,7 @@ export function PlacementEditorScene({ controller, renderMode }: PlacementEditor
               placement={instance}
               selected={false}
               renderMode={renderMode}
-              onSelect={controller.selectInstance}
+              onSelect={selectInstance}
             />
           )
         })}
@@ -777,7 +1096,7 @@ export function PlacementEditorScene({ controller, renderMode }: PlacementEditor
               placement={selectedInstance}
               selected
               renderMode={renderMode}
-              onSelect={controller.selectInstance}
+              onSelect={selectInstance}
               setRef={(group) => {
                 if (selectedObjectRef.current === group) return
                 selectedObjectRef.current = group
@@ -846,53 +1165,97 @@ export function PlacementEditorOverlay({ controller }: PlacementEditorOverlayPro
         </AppButton>
       </div>
 
-      {selectedInstance && (
-        <ChromePanel className="pointer-events-auto fixed font-mono right-4 top-4 w-72 p-2 whitespace-nowrap">
-          <div className="mb-2 min-w-0">
-            <div className="truncate text-xs font-medium text-white/90">{selectedAsset?.name ?? selectedInstance.objectId}</div>
-            <div className="truncate text-[10px] text-white/35">{selectedInstance.instanceId}</div>
-          </div>
-          <div className="flex flex-col gap-1">
-            {TRANSFORM_FIELDS.map(({ field, label, step }) => (
-              <div key={field} className="grid grid-cols-[2.75rem_repeat(3,minmax(0,1fr))] items-center gap-1">
-                <div className="text-[10px] tracking-[0.16em] text-white/40">{label}</div>
-                {TRANSFORM_AXES.map(({ axis, label: axisLabel }) => (
-                  <label key={`${field}-${axis}`} className="min-w-0">
-                    <span className="sr-only">{`${label} ${axisLabel}`}</span>
-                    <input
-                      type="number"
-                      step={step}
-                      value={transformInputValue(field, selectedInstance[field][axis])}
-                      onChange={(event) => controller.updateSelectedTransform(
-                        field,
-                        axis,
-                        transformPlacementValue(field, Number.parseFloat(event.currentTarget.value)),
-                      )}
-                      onBlur={(event) => {
-                        const value = Number.parseFloat(event.currentTarget.value)
-                        if (!Number.isFinite(value)) return
-                        controller.updateSelectedTransform(field, axis, transformPlacementValue(field, snapTransformInputValue(field, value)))
-                      }}
-                      className="h-7 w-full rounded border border-white/10 bg-black/40 px-1.5 text-right text-xs text-white/85"
-                    />
-                  </label>
-                ))}
+      <ChromePanel className="pointer-events-auto fixed font-mono right-4 top-4 w-72 p-2 whitespace-nowrap">
+        <div className="flex flex-col gap-1">
+          {selectedInstance ? (
+            <>
+              <div className="mb-1 min-w-0">
+                <div className="truncate text-xs font-medium text-white/90">{selectedAsset?.name ?? selectedInstance.objectId}</div>
+                <div className="truncate text-[10px] text-white/35">{selectedInstance.instanceId}</div>
               </div>
-            ))}
-            <label className="grid grid-cols-[2.75rem_1fr] items-center gap-1">
-              <span className="text-[10px] tracking-[0.16em] text-white/40">Body</span>
-              <select
-                value={selectedInstance.physics ?? 'rigidbody'}
-                onChange={(event) => controller.updateSelectedPhysics(event.currentTarget.value as WorldObjectPhysics)}
-                className="h-7 rounded border border-white/10 bg-black/40 px-1.5 text-xs text-white/85"
+              {TRANSFORM_FIELDS.map(({ field, label, step }) => (
+                <div key={field} className="grid grid-cols-[2.75rem_repeat(3,minmax(0,1fr))] items-center gap-1">
+                  <div className="text-[10px] tracking-[0.16em] text-white/40">{label}</div>
+                  {TRANSFORM_AXES.map(({ axis, label: axisLabel }) => (
+                    <label key={`${field}-${axis}`} className="min-w-0">
+                      <span className="sr-only">{`${label} ${axisLabel}`}</span>
+                      <TransformValueInput
+                        field={field}
+                        axis={axis}
+                        step={step}
+                        value={selectedInstance[field][axis]}
+                        onChange={controller.updateSelectedTransform}
+                      />
+                    </label>
+                  ))}
+                </div>
+              ))}
+              <label className="grid grid-cols-[2.75rem_1fr] items-center gap-1">
+                <span className="text-[10px] tracking-[0.16em] text-white/40">Body</span>
+                <select
+                  value={selectedInstance.physics ?? 'rigidbody'}
+                  onChange={(event) => controller.updateSelectedPhysics(event.currentTarget.value as WorldObjectPhysics)}
+                  className="h-7 rounded border border-white/10 bg-black/40 px-1.5 text-xs text-white/85"
+                >
+                  <option value="rigidbody">Rigidbody</option>
+                  <option value="static">Static</option>
+                </select>
+              </label>
+            </>
+          ) : (
+            <div className="pb-1 text-[10px] text-white/35">No object selected</div>
+          )}
+            <div className={`${selectedInstance ? 'border-t border-white/10 pt-1' : ''} grid grid-cols-[2.75rem_2.25rem_repeat(3,minmax(0,1fr))] items-center gap-1`}>
+              <span className="text-[10px] tracking-[0.16em] text-white/40">Sun</span>
+              <NumberValueInput
+                value={controller.sun.intensity}
+                step={0.01}
+                onChange={controller.updateSunIntensity}
+                className="h-6 text-[11px]"
+              />
+              {TRANSFORM_AXES.map(({ axis, label }) => (
+                <label key={`sun-${axis}`} className="min-w-0">
+                  <span className="sr-only">{`Sun rotation ${label}`}</span>
+                  <NumberValueInput
+                    value={controller.sun.rotation[axis]}
+                    displayValue={THREE.MathUtils.radToDeg(controller.sun.rotation[axis])}
+                    step={1}
+                    toStoredValue={THREE.MathUtils.degToRad}
+                    onChange={(value) => controller.updateSunRotation(axis, value)}
+                    className="h-6 text-[11px]"
+                  />
+                </label>
+              ))}
+            </div>
+            <div className="grid grid-cols-[2.75rem_repeat(2,minmax(0,1fr))] items-center gap-1">
+              <span className="text-[10px] tracking-[0.16em] text-white/40">Env</span>
+              <NumberValueInput
+                value={controller.sun.environmentIntensity ?? DEFAULT_SCENE_SUN.environmentIntensity ?? 2}
+                step={0.01}
+                onChange={controller.updateEnvironmentIntensity}
+                className="h-6 text-[11px]"
+              />
+              <span className="text-[10px] tracking-[0.16em] text-white/40">HDRI</span>
+            </div>
+            <div className="grid grid-cols-[2.75rem_1fr_auto] items-center gap-1">
+              <span className="text-[10px] tracking-[0.16em] text-white/40">World</span>
+              <NumberValueInput
+                value={controller.metricScaleFactor}
+                step={0.01}
+                onChange={controller.updateMetricScaleFactor}
+                className="h-6 text-[11px]"
+              />
+              <AppButton
+                onClick={controller.resetMetricScaleFactor}
+                className="h-6 px-1.5 py-0 text-[10px] text-white/55"
+                aria-label="Reset world scale"
+                title="Reset world scale"
               >
-                <option value="rigidbody">Rigidbody</option>
-                <option value="static">Static</option>
-              </select>
-            </label>
-          </div>
-        </ChromePanel>
-      )}
+                Reset
+              </AppButton>
+            </div>
+        </div>
+      </ChromePanel>
 
       <div className={`${chrome.enter} fixed inset-y-4 left-4 flex w-[min(24rem,calc(100vw-2rem))] max-w-sm flex-col gap-2`}>
         <div className="flex min-h-0 flex-col gap-2">
@@ -903,9 +1266,9 @@ export function PlacementEditorOverlay({ controller }: PlacementEditorOverlayPro
                 className="inline-flex h-8 w-8 items-center justify-center rounded px-2 py-1 text-xs opacity-80 transition-[background-color,opacity] hover:bg-white/10 hover:opacity-100"
                 href={`/${controller.slug}`}
                 aria-label="Return to world"
-                onClick={async (event) => {
+                onClick={(event) => {
                   event.preventDefault()
-                  if (!await controller.saveProject()) return
+                  if (controller.dirty && !window.confirm('You have unsaved scene changes. Leave without saving?')) return
                   navigate(`/${controller.slug}`)
                 }}
               >

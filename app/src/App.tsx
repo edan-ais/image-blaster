@@ -7,6 +7,7 @@ import { TouchControls } from './components/TouchControls'
 import { useSceneProject } from './modules/scene/useSceneProject'
 import { loadWorlds } from './utils/worldLoader'
 import { useDebugStore } from './store/debug'
+import { isEditableTarget } from './utils/dom'
 
 const worlds = loadWorlds()
 const LevaPanel = import.meta.env.DEV
@@ -15,14 +16,6 @@ const LevaPanel = import.meta.env.DEV
 const DebugPanel = import.meta.env.DEV
   ? lazy(() => import('./components/DebugPanel').then((module) => ({ default: module.DebugPanel })))
   : null
-
-function isEditableTarget(target: EventTarget | null) {
-  if (!(target instanceof HTMLElement)) return false
-  return target instanceof HTMLInputElement
-    || target instanceof HTMLTextAreaElement
-    || target instanceof HTMLSelectElement
-    || target.isContentEditable
-}
 
 export function App() {
   const [editMatch, editParams] = useRoute('/:slug/edit')
@@ -133,11 +126,13 @@ export function App() {
               }))}
             />
           </div>
-          <div className="fixed inset-x-0 bottom-4 z-20 flex justify-center px-4 sm:left-4 sm:right-auto sm:justify-start sm:px-0">
-            <BottomLeftControls />
-          </div>
           <TouchControls />
         </>
+      )}
+      {uiVisible && (
+        <div className="fixed inset-x-0 bottom-4 z-20 flex justify-center px-4 sm:left-4 sm:right-auto sm:justify-start sm:px-0">
+          <BottomLeftControls editing={editing} />
+        </div>
       )}
     </div>
   )

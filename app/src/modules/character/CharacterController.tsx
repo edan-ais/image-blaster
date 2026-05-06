@@ -4,6 +4,7 @@ import { RigidBody, CapsuleCollider, useRapier } from '@react-three/rapier'
 import * as THREE from 'three'
 import { useCameraGestures } from '../camera/useCameraGestures'
 import { useDebugStore } from '../../store/debug'
+import { isEditableTarget } from '../../utils/dom'
 
 export interface CharacterControllerHandle {
   reset: () => void
@@ -91,6 +92,10 @@ export const CharacterController = forwardRef<CharacterControllerHandle>(
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
+      if (isEditableTarget(e.target)) {
+        keys.current.delete(e.code)
+        return
+      }
       if (e.type === 'keydown') {
         keys.current.add(e.code)
         if (e.code === 'Space' && !e.repeat) {

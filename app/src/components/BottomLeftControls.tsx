@@ -15,6 +15,7 @@ import { type ReactElement, useEffect } from 'react'
 import { useAudioStore } from '../store/audio'
 import { type ControllerMode, useDebugStore } from '../store/debug'
 import { ObjectRenderMode, ViewerQuality, WorldRenderMode } from '../types/world'
+import { isEditableTarget } from '../utils/dom'
 import { AppButton } from './AppButton'
 import { chrome } from './AppChrome'
 
@@ -59,7 +60,7 @@ function ControlTooltip({ content, children }: { content: string; children: Reac
   )
 }
 
-export function BottomLeftControls() {
+export function BottomLeftControls({ editing = false }: { editing?: boolean }) {
   const muted = useAudioStore((s) => s.muted)
   const toggleMuted = useAudioStore((s) => s.toggleMuted)
   const resetObjects = useDebugStore((s) => s.resetObjects)
@@ -74,7 +75,7 @@ export function BottomLeftControls() {
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
-      if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) return
+      if (isEditableTarget(e.target)) return
       const n = DIGIT_KEY_INDEX[e.code]
       if (n === undefined) return
       if (e.altKey && e.shiftKey) {
@@ -100,6 +101,8 @@ export function BottomLeftControls() {
 
   const utilBtn =
     'w-8 h-8 justify-center text-white rounded'
+  const disabledBtn =
+    'disabled:pointer-events-none disabled:opacity-30'
 
   const modeBtn = (active: boolean) =>
     `w-8 h-8 justify-center rounded ${
@@ -112,8 +115,12 @@ export function BottomLeftControls() {
   return (
     <div className={`${chrome.enter} ${chrome.bar} flex h-10 w-full items-center justify-center gap-1 px-2 sm:w-auto`}>
       {/* utility */}
-      <ControlTooltip content="Reset">
-        <AppButton onClick={resetObjects} className={utilBtn}>
+      <ControlTooltip content={editing ? 'Reset unavailable while editing' : 'Reset'}>
+        <AppButton
+          onClick={resetObjects}
+          className={`${utilBtn} ${disabledBtn}`}
+          disabled={editing}
+        >
           <ArrowCounterClockwise size={18} weight="bold" />
         </AppButton>
       </ControlTooltip>
@@ -126,10 +133,11 @@ export function BottomLeftControls() {
       <div className={`${chrome.divider} mx-1`} />
 
       {/* controller mode */}
-      <ControlTooltip content="Change controller">
+      <ControlTooltip content={editing ? 'Controller unavailable while editing' : 'Change controller'}>
         <AppButton
           onClick={() => setControllerMode(nextMode(CONTROLLER_MODES, controllerMode))}
-          className={'w-24'}
+          className={`w-24 ${disabledBtn}`}
+          disabled={editing}
         >
           <CameraIcon size={15} weight="regular" className="text-white/45 flex-shrink-0" />
           <span>{currentControllerMode.label}</span>

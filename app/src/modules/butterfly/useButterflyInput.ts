@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef } from 'react'
 import { useThree } from '@react-three/fiber'
 import { useCameraDollyGestures } from '../camera/useCameraDollyGestures'
 import { useButterflyStore } from './store'
+import { isEditableTarget } from '../../utils/dom'
 
 export interface ButterflyInput {
   keys: React.MutableRefObject<Set<string>>
@@ -37,16 +38,8 @@ export function useButterflyInput(): ButterflyInput {
   useCameraDollyGestures({ domElement: gl.domElement, onDollyPixels: applyDolly })
 
   useEffect(() => {
-    const isEditable = (el: EventTarget | null) => {
-      if (!(el instanceof HTMLElement)) return false
-      const tag = el.tagName
-      if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT') return true
-      if (el.isContentEditable) return true
-      return false
-    }
-
     const onKey = (e: KeyboardEvent) => {
-      if (isEditable(e.target)) {
+      if (isEditableTarget(e.target)) {
         keys.current.delete(e.code)
         return
       }

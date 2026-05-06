@@ -56,9 +56,17 @@ export interface WorldObjectPlacement {
   scale: Vec3Tuple
 }
 
+export interface WorldSceneSun {
+  intensity: number
+  rotation: Vec3Tuple
+  environmentIntensity?: number
+}
+
 export interface WorldSceneProject {
   version: 1
   instances: WorldObjectPlacement[]
+  sun?: WorldSceneSun
+  metricScaleFactor?: number
 }
 
 export interface WorldVersion {

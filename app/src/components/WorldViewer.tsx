@@ -17,12 +17,31 @@ import { AudioManager } from '../modules/audio/AudioManager'
 import { PostProcessing } from '../modules/postprocessing/PostProcessing'
 import { getSplatUrl } from '../utils/worldLoader'
 import { useDebugStore } from '../store/debug'
-import { WorldRenderMode, ObjectRenderMode, ViewerQuality, type SourceImageVersion, type World, type WorldObjectAsset, type WorldSceneProject } from '../types/world'
+import { WorldRenderMode, ObjectRenderMode, ViewerQuality, type SourceImageVersion, type Vec3Tuple, type World, type WorldObjectAsset, type WorldSceneProject } from '../types/world'
 import { AppButton } from './AppButton'
 import { chrome } from './AppChrome'
 
 type CharHandle = CharacterControllerHandle | FlyControllerHandle
 const DEFAULT_ENVIRONMENT_URL = '/hdri.jpg'
+
+function sunPositionFromRotation(rotation: Vec3Tuple): Vec3Tuple {
+  let x = 0
+  let y = 10
+  let z = 0
+  const [rx, ry, rz] = rotation
+  const cx = Math.cos(rx)
+  const sx = Math.sin(rx)
+  const cy = Math.cos(ry)
+  const sy = Math.sin(ry)
+  const cz = Math.cos(rz)
+  const sz = Math.sin(rz)
+
+  ;[y, z] = [y * cx - z * sx, y * sx + z * cx]
+  ;[x, z] = [x * cy + z * sy, -x * sy + z * cy]
+  ;[x, y] = [x * cz - y * sz, x * sz + y * cz]
+
+  return [x, y, z]
+}
 
 interface OptionalAssetBoundaryProps {
   label: string
@@ -142,6 +161,7 @@ export function WorldViewer({
   const splatUrl = getSplatUrl(desiredWorld)
   const { ground_plane_offset, flip_y, metric_scale_factor } = desiredWorld.assets.splats.semantics_metadata
   const flipY = flip_y ?? true
+  const baseMetricScaleFactor = metric_scale_factor ?? 1
   const isHighQuality = viewerQuality === ViewerQuality.High
   const showScene = worldRenderMode !== WorldRenderMode.ObjectOnly
   const showSplat = showScene && objectRenderMode === ObjectRenderMode.Lit
@@ -157,12 +177,20 @@ export function WorldViewer({
     objects: desiredObjectAssets,
     allObjectAssets,
     sceneProject,
+    baseMetricScaleFactor,
     sceneProjectReady,
     editing,
     onProjectSaved: onSceneProjectSaved,
   })
+  const activeSceneSun = editing ? placementEditor.sun : sceneProject?.sun
+  const activeSunIntensity = activeSceneSun?.intensity ?? sunIntensity
+  const activeEnvironmentIntensity = activeSceneSun?.environmentIntensity ?? environmentIntensity
+  const activeSunPosition = sunPositionFromRotation(activeSceneSun?.rotation ?? [0, 0, 0])
+  const activeMetricScaleFactor = editing ? placementEditor.metricScaleFactor : sceneProject?.metricScaleFactor ?? baseMetricScaleFactor
+  const activeGroundPlaneOffset = ground_plane_offset * (activeMetricScaleFactor / baseMetricScaleFactor)
   const objectPlacements = sceneProject?.instances ?? placementEditor.instances
   const objectPhysicsAssets = sceneProject?.instances.length ? allObjectAssets : desiredObjectAssets
+  const activeControllerMode = editing ? 'fly' : controllerMode
   return (
     <>
       <Canvas
@@ -174,15 +202,15 @@ export function WorldViewer({
         <Suspense fallback={null}>
           <AudioManager urls={worldSfxUrls} />
           <Physics key={`${desiredSlug}:${controllerResetToken}`} gravity={[0, -9.81, 0]}>
-            {controllerMode === 'fly' ? (
-              <FlyController ref={charRef as React.RefObject<FlyControllerHandle>} />
+            {activeControllerMode === 'fly' ? (
+              <FlyController ref={charRef as React.RefObject<FlyControllerHandle>} preserveCameraOnMount={editing} />
             ) : (
               <CharacterController ref={charRef as React.RefObject<CharacterControllerHandle>} />
             )}
             {showScene && colliderUrl && (
               <OptionalAssetBoundary label={colliderUrl} resetKey={colliderUrl}>
                 <Suspense fallback={null}>
-                  <WorldCollider url={colliderUrl} flipY={flipY} groundPlaneOffset={ground_plane_offset} metricScaleFactor={metric_scale_factor} />
+                  <WorldCollider url={colliderUrl} flipY={flipY} groundPlaneOffset={activeGroundPlaneOffset} metricScaleFactor={activeMetricScaleFactor} />
                 </Suspense>
               </OptionalAssetBoundary>
             )}
@@ -203,18 +231,20 @@ export function WorldViewer({
               <SplatRenderer
                 url={splatUrl}
                 visible={showSplat}
-                groundPlaneOffset={ground_plane_offset}
+                groundPlaneOffset={activeGroundPlaneOffset}
                 flipY={flipY}
-                metricScaleFactor={metric_scale_factor}
+                metricScaleFactor={activeMetricScaleFactor}
               />
             </OptionalAssetBoundary>
           )}
           <directionalLight
             castShadow={isHighQuality}
             color={sunColor}
-            intensity={sunIntensity}
-            position={[0, 10, 0]}
+            intensity={activeSunIntensity}
+            position={activeSunPosition}
             shadow-mapSize={[2048, 2048]}
+            shadow-bias={-0.0001}
+            shadow-normalBias={0.02}
             shadow-camera-near={0.5}
             shadow-camera-far={30}
             shadow-camera-left={-20}
@@ -223,13 +253,13 @@ export function WorldViewer({
             shadow-camera-bottom={-20}
           />
           {panoUrl && (
-            <OptionalAssetBoundary label={panoUrl} resetKey={panoUrl} fallback={<DefaultEnvironment intensity={environmentIntensity} />}>
+            <OptionalAssetBoundary label={panoUrl} resetKey={panoUrl} fallback={<DefaultEnvironment intensity={activeEnvironmentIntensity} />}>
               <Suspense fallback={null}>
-                <EnvironmentMap panoUrl={panoUrl} intensity={environmentIntensity} />
+                <EnvironmentMap panoUrl={panoUrl} intensity={activeEnvironmentIntensity} />
               </Suspense>
             </OptionalAssetBoundary>
           )}
-          {!panoUrl && <DefaultEnvironment intensity={environmentIntensity} />}
+          {!panoUrl && <DefaultEnvironment intensity={activeEnvironmentIntensity} />}
           {butterfliesEnabled && <ButterflyScene />}
           <OriginHelper />
           {isHighQuality && <PostProcessing />}
@@ -271,7 +301,7 @@ function SourceImageControls({
   if (!activeSourceImageUrl && !import.meta.env.DEV) return null
 
   return (
-    <div className={`pointer-events-none fixed bottom-4 right-4 z-30 hidden md:block ${chrome.enter}`}>
+    <div className={`pointer-events-none fixed bottom-2 right-2 z-30 hidden md:block ${chrome.enter}`}>
       {activeSourceImageUrl ? (
         thumbnailCollapsed ? (
           <div className="flex items-center gap-1">
@@ -297,7 +327,7 @@ function SourceImageControls({
               draggable={false}
             />
             <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-black/30" />
-            <div className="absolute bottom-2 right-2 flex items-center gap-1">
+            <div className="absolute bottom-0.5 right-0.5 flex items-center gap-1">
               {import.meta.env.DEV && (
                 <HotReloadButton
                   hotReloadEnabled={hotReloadEnabled}

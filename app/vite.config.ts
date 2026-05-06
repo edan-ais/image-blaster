@@ -397,16 +397,16 @@ function worldsPlugin(): Plugin {
     if (!input || typeof input !== 'object') return undefined
     const record = input as Record<string, unknown>
     if (record.version !== PROJECT_VERSION || !Array.isArray(record.instances)) return undefined
+    const isVec3 = (value: unknown): value is [number, number, number] => (
+      Array.isArray(value) &&
+      value.length === 3 &&
+      value.every((part) => typeof part === 'number' && Number.isFinite(part))
+    )
 
     const instances = record.instances.flatMap((instance): Array<Record<string, unknown>> => {
       if (!instance || typeof instance !== 'object') return []
       const item = instance as Record<string, unknown>
       const { instanceId, objectId, assetId, physics, position, rotation, scale } = item
-      const isVec3 = (value: unknown): value is [number, number, number] => (
-        Array.isArray(value) &&
-        value.length === 3 &&
-        value.every((part) => typeof part === 'number' && Number.isFinite(part))
-      )
 
       if (typeof instanceId !== 'string' || typeof objectId !== 'string') return []
       if (assetId !== undefined && typeof assetId !== 'string') return []
@@ -414,8 +414,26 @@ function worldsPlugin(): Plugin {
       if (!isVec3(position) || !isVec3(rotation) || !isVec3(scale)) return []
       return [{ instanceId, objectId, ...(assetId ? { assetId } : {}), physics: physics ?? 'rigidbody', position, rotation, scale }]
     })
+    const sun = (() => {
+      if (!record.sun || typeof record.sun !== 'object') return undefined
+      const candidate = record.sun as Record<string, unknown>
+      if (typeof candidate.intensity !== 'number' || !Number.isFinite(candidate.intensity)) return undefined
+      if (!isVec3(candidate.rotation)) return undefined
+      const environmentIntensity = candidate.environmentIntensity
+      return {
+        intensity: candidate.intensity,
+        rotation: candidate.rotation,
+        ...(typeof environmentIntensity === 'number' && Number.isFinite(environmentIntensity) ? { environmentIntensity } : {}),
+      }
+    })()
+    const metricScaleFactor = record.metricScaleFactor
 
-    return { version: PROJECT_VERSION, instances }
+    return {
+      version: PROJECT_VERSION,
+      instances,
+      ...(sun ? { sun } : {}),
+      ...(typeof metricScaleFactor === 'number' && Number.isFinite(metricScaleFactor) ? { metricScaleFactor } : {}),
+    }
   }
 
   function readSceneProject(slug: string) {
@@ -457,10 +475,6 @@ function worldsPlugin(): Plugin {
     if (relative.startsWith('..') || path.isAbsolute(relative)) return false
     const parts = relative.split(path.sep)
     return parts.length === 4 && parts[1] === 'output' && parts[2] === 'world' && (parts[3] === 'world.json' || /^\d+-world\.json$/.test(parts[3]))
-  }
-
-  function isWorldCatalogFile(file: string) {
-    return isWorldProjectFile(file) || isWorldManifestFile(file)
   }
 
   function isActiveWorldOutputPath(file: string) {
@@ -533,13 +547,16 @@ function worldsPlugin(): Plugin {
       if (!worldSlug) return
       if (hasHiddenPathPart(file)) return []
       const isSceneProject = isSceneProjectFile(file)
-      const shouldReloadWorldsModule = isWorldCatalogFile(file) ||
-        isActiveWorldOutputPath(file) ||
-        (isSceneProject && !activeWorldEditing) ||
-        (RELOAD_EXTENSIONS.has(path.extname(file).toLowerCase()) && !isSceneProject)
+      const isActiveWorldFile = activeWorldSlug !== null && worldSlug === activeWorldSlug
+      const shouldReloadWorldsModule = isWorldProjectFile(file) ||
+        (isActiveWorldFile && (
+          isWorldManifestFile(file) ||
+          isActiveWorldOutputPath(file) ||
+          (isSceneProject && !activeWorldEditing) ||
+          (RELOAD_EXTENSIONS.has(path.extname(file).toLowerCase()) && !isSceneProject)
+        ))
       if (!shouldReloadWorldsModule) return
       if (!hotReloadEnabled) return []
-      if (activeWorldSlug !== null && worldSlug !== activeWorldSlug && !isWorldCatalogFile(file)) return []
       if (shouldReloadWorldsModule) {
         const mod = server.moduleGraph.getModuleById(RESOLVED_ID)
         if (mod) server.moduleGraph.invalidateModule(mod)
@@ -563,11 +580,11 @@ function worldsPlugin(): Plugin {
         return Boolean(worldSlug && (activeWorldSlug === null || worldSlug === activeWorldSlug))
       }
       server.watcher.on('add', (file) => {
-        if (!hotReloadEnabled || hasHiddenPathPart(file) || (!isActiveWorldOutputPath(file) && !isWorldCatalogFile(file) && !shouldReloadSceneProject(file))) return
+        if (!hotReloadEnabled || hasHiddenPathPart(file) || (!isActiveWorldOutputPath(file) && !isWorldProjectFile(file) && !shouldReloadSceneProject(file))) return
         reloadWorldsModule()
       })
       server.watcher.on('unlink', (file) => {
-        if (!hotReloadEnabled || hasHiddenPathPart(file) || (!isActiveWorldOutputPath(file) && !isWorldCatalogFile(file) && !shouldReloadSceneProject(file))) return
+        if (!hotReloadEnabled || hasHiddenPathPart(file) || (!isActiveWorldOutputPath(file) && !isWorldProjectFile(file) && !shouldReloadSceneProject(file))) return
         reloadWorldsModule()
       })
       server.watcher.on('addDir', (file) => {

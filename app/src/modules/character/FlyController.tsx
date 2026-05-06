@@ -4,9 +4,14 @@ import * as THREE from 'three'
 import { useCameraGestures } from '../camera/useCameraGestures'
 import { cameraFocusTarget } from '../camera/cameraFocus'
 import { useDebugStore } from '../../store/debug'
+import { isEditableTarget } from '../../utils/dom'
 
 export interface FlyControllerHandle {
   reset: () => void
+}
+
+interface FlyControllerProps {
+  preserveCameraOnMount?: boolean
 }
 
 const SPEED = 6
@@ -23,7 +28,7 @@ const _up = new THREE.Vector3(0, 1, 0)
 const _move = new THREE.Vector3()
 const _euler = new THREE.Euler(0, 0, 0, 'YXZ')
 
-export const FlyController = forwardRef<FlyControllerHandle>(function FlyController(_, ref) {
+export const FlyController = forwardRef<FlyControllerHandle, FlyControllerProps>(function FlyController({ preserveCameraOnMount = false }, ref) {
   const { camera, gl } = useThree()
   const mouseSensitivity = useDebugStore((s) => s.flyMouseSensitivity)
   const keys = useRef(new Set<string>())
@@ -41,6 +46,16 @@ export const FlyController = forwardRef<FlyControllerHandle>(function FlyControl
     smoothYaw.current = DEFAULT_YAW
     smoothPitch.current = 0
     camera.quaternion.setFromEuler(_euler.set(0, DEFAULT_YAW, 0))
+  }, [camera])
+
+  const preserveCamera = useCallback(() => {
+    cameraFocusTarget.current = null
+    keys.current.clear()
+    _euler.setFromQuaternion(camera.quaternion, 'YXZ')
+    rawYaw.current = _euler.y
+    rawPitch.current = _euler.x
+    smoothYaw.current = _euler.y
+    smoothPitch.current = _euler.x
   }, [camera])
 
   const applyDolly = useCallback((deltaY: number) => {
@@ -62,11 +77,16 @@ export const FlyController = forwardRef<FlyControllerHandle>(function FlyControl
   }), [reset])
 
   useEffect(() => {
-    reset()
-  }, [reset])
+    if (preserveCameraOnMount) preserveCamera()
+    else reset()
+  }, [preserveCamera, preserveCameraOnMount, reset])
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
+      if (isEditableTarget(e.target)) {
+        keys.current.delete(e.code)
+        return
+      }
       if (e.type === 'keydown') keys.current.add(e.code)
       else keys.current.delete(e.code)
     }

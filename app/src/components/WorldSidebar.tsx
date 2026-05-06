@@ -117,7 +117,7 @@ export function WorldSidebar({
                         ${isActive ? 'hover:bg-transparent' : ''}
                       `}
                     >
-                      <span className="block min-w-0 flex-1 truncate text-sm font-medium leading-tight text-white">{name}</span>
+                      <span className="block min-w-0 flex-1 truncate text-sm font-medium leading-tight text-white">{slug}</span>
                     </AppButton>
                     {isActive && (
                       <Tooltip
