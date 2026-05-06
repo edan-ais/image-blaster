@@ -397,11 +397,42 @@ function worldsPlugin(): Plugin {
     return path.basename(file) === 'project.json' && path.basename(path.dirname(file)) === 'scene'
   }
 
-  function isWorldCatalogFile(file: string) {
+  function hasHiddenPathPart(file: string) {
+    const relative = path.relative(worldsDir, file)
+    if (relative.startsWith('..') || path.isAbsolute(relative)) return false
+    return relative.split(path.sep).some((part) => part.startsWith('.'))
+  }
+
+  function isTopLevelWorldDir(file: string) {
+    const relative = path.relative(worldsDir, file)
+    if (relative.startsWith('..') || path.isAbsolute(relative)) return false
+    const parts = relative.split(path.sep)
+    return parts.length === 1 && Boolean(parts[0]) && !parts[0].startsWith('.')
+  }
+
+  function isWorldProjectFile(file: string) {
+    const relative = path.relative(worldsDir, file)
+    if (relative.startsWith('..') || path.isAbsolute(relative)) return false
+    const parts = relative.split(path.sep)
+    return parts.length === 2 && parts[1] === 'project.json'
+  }
+
+  function isWorldManifestFile(file: string) {
     const relative = path.relative(worldsDir, file)
     if (relative.startsWith('..') || path.isAbsolute(relative)) return false
     const parts = relative.split(path.sep)
     return parts.length === 4 && parts[1] === 'output' && parts[2] === 'world' && (parts[3] === 'world.json' || /^\d+-world\.json$/.test(parts[3]))
+  }
+
+  function isWorldCatalogFile(file: string) {
+    return isWorldProjectFile(file) || isWorldManifestFile(file)
+  }
+
+  function isActiveWorldOutputPath(file: string) {
+    if (!activeWorldSlug) return false
+    const outputDir = path.join(worldsDir, activeWorldSlug, 'output')
+    const relative = path.relative(outputDir, file)
+    return relative === '' || (!relative.startsWith('..') && !path.isAbsolute(relative))
   }
 
   function worldSlugForFile(file: string) {
@@ -464,7 +495,8 @@ function worldsPlugin(): Plugin {
       const RELOAD_EXTENSIONS = new Set(['.glb', '.spz', '.mp3', '.ogg', '.wav', '.m4a', '.opus', '.json'])
       const worldSlug = worldSlugForFile(file)
       if (!worldSlug) return
-      const shouldReloadWorldsModule = RELOAD_EXTENSIONS.has(path.extname(file).toLowerCase()) && !isSceneProjectFile(file)
+      if (hasHiddenPathPart(file)) return []
+      const shouldReloadWorldsModule = isWorldCatalogFile(file) || isActiveWorldOutputPath(file) || (RELOAD_EXTENSIONS.has(path.extname(file).toLowerCase()) && !isSceneProjectFile(file))
       if (!shouldReloadWorldsModule) return
       if (!hotReloadEnabled) return []
       if (activeWorldSlug !== null && worldSlug !== activeWorldSlug && !isWorldCatalogFile(file)) return []
@@ -481,6 +513,26 @@ function worldsPlugin(): Plugin {
         const mod = server.moduleGraph.getModuleById(RESOLVED_ID)
         if (mod) server.moduleGraph.invalidateModule(mod)
       }
+      const reloadWorldsModule = () => {
+        invalidateWorldsModule()
+        server.ws.send({ type: 'full-reload' })
+      }
+      server.watcher.on('add', (file) => {
+        if (!hotReloadEnabled || hasHiddenPathPart(file) || (!isActiveWorldOutputPath(file) && !isWorldCatalogFile(file))) return
+        reloadWorldsModule()
+      })
+      server.watcher.on('unlink', (file) => {
+        if (!hotReloadEnabled || hasHiddenPathPart(file) || (!isActiveWorldOutputPath(file) && !isWorldCatalogFile(file))) return
+        reloadWorldsModule()
+      })
+      server.watcher.on('addDir', (file) => {
+        if (!hotReloadEnabled || hasHiddenPathPart(file) || (!isTopLevelWorldDir(file) && !isActiveWorldOutputPath(file))) return
+        reloadWorldsModule()
+      })
+      server.watcher.on('unlinkDir', (file) => {
+        if (!hotReloadEnabled || hasHiddenPathPart(file) || (!isTopLevelWorldDir(file) && !isActiveWorldOutputPath(file))) return
+        reloadWorldsModule()
+      })
       const MIME: Record<string, string> = {
         '.spz': 'application/octet-stream',
         '.glb': 'model/gltf-binary',

@@ -183,7 +183,7 @@ export function WorldSidebar({
                             >
                               {worldVersions.map((version) => (
                                 <option key={version.index} value={version.index}>
-                                  {version.label} / {worldVersions.length}
+                                  {version.label}
                                 </option>
                               ))}
                             </select>
