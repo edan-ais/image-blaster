@@ -55,6 +55,7 @@ IMAGE-BLASTER uses a few generation models:
 - `--face-count <40000-1500000>`: target face count. IMAGE-BLASTER defaults to `50000`; Hunyuan's API default is `500000`.
 - `--enable-pbr true|false`: enable PBR material generation. Defaults to `true`.
 - `--generate-type Normal|LowPoly|Geometry`: `Normal` creates a textured model, `LowPoly` applies polygon reduction, and `Geometry` creates a white geometry-only model. Defaults to `Normal`.
+- `--polygon-type triangle|quadrilateral`: polygon type for `LowPoly`. Defaults to `triangle`.
 
 ### Examples
 

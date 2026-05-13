@@ -5,6 +5,7 @@ import {
   DEFAULT_HUNYUAN_ENABLE_PBR,
   DEFAULT_HUNYUAN_FACE_COUNT,
   DEFAULT_HUNYUAN_GENERATE_TYPE,
+  DEFAULT_HUNYUAN_POLYGON_TYPE,
   HUNYUAN_3D_PROVIDER,
   runHunyuan3D
 } from "./hunyuan-3d.mjs";
@@ -55,6 +56,8 @@ const MODEL_PROVIDER_ALIASES = new Map([
   ["fal-ai/meshy/v6/image-to-3d", MESHY_3D_PROVIDER],
   ["hunyuan", HUNYUAN_3D_PROVIDER],
   ["hunyuan-3d", HUNYUAN_3D_PROVIDER],
+  ["hunyuan3d-v3", HUNYUAN_3D_PROVIDER],
+  ["fal-ai/hunyuan3d-v3/image-to-3d", HUNYUAN_3D_PROVIDER],
   ["fal-ai/hunyuan-3d/v3.1/pro/image-to-3d", HUNYUAN_3D_PROVIDER]
 ]);
 
@@ -363,6 +366,7 @@ export async function generateSingleObject(options) {
     hunyuanFaceCount = DEFAULT_HUNYUAN_FACE_COUNT,
     hunyuanEnablePbr = DEFAULT_HUNYUAN_ENABLE_PBR,
     hunyuanGenerateType = DEFAULT_HUNYUAN_GENERATE_TYPE,
+    hunyuanPolygonType = DEFAULT_HUNYUAN_POLYGON_TYPE,
     meshyTopology = DEFAULT_MESHY_TOPOLOGY,
     meshyTargetPolycount = DEFAULT_MESHY_TARGET_POLYCOUNT,
     meshySymmetryMode = DEFAULT_MESHY_SYMMETRY_MODE,
@@ -525,6 +529,7 @@ export async function generateSingleObject(options) {
             faceCount: hunyuanFaceCount,
             enablePbr: provider === MESHY_3D_PROVIDER ? meshyEnablePbr : hunyuanEnablePbr,
             generateType: hunyuanGenerateType,
+            polygonType: hunyuanPolygonType,
             topology: meshyTopology,
             targetPolycount: meshyTargetPolycount,
             symmetryMode: meshySymmetryMode,
@@ -588,7 +593,7 @@ async function main() {
 
   if (!world || (!objectId && !directImage)) {
     throw new Error(
-      "Usage: node generate-single-asset.mjs --world <world-name> (--object-id <object-id> | --image <path>) [--object-name <name>] [--description <text>] [--provider hunyuan|meshy] [--regenerate] [--reference-only] [--face-count <40000-1500000>] [--target-polycount 30000] [--enable-pbr true|false]"
+      "Usage: node generate-single-asset.mjs --world <world-name> (--object-id <object-id> | --image <path>) [--object-name <name>] [--description <text>] [--provider hunyuan|meshy] [--regenerate] [--reference-only] [--face-count <40000-1500000>] [--generate-type Normal|LowPoly|Geometry] [--polygon-type triangle|quadrilateral] [--target-polycount 30000] [--enable-pbr true|false]"
     );
   }
 
@@ -605,6 +610,7 @@ async function main() {
     hunyuanFaceCount: one(flags, "face-count", DEFAULT_HUNYUAN_FACE_COUNT),
     hunyuanEnablePbr: one(flags, "enable-pbr", DEFAULT_HUNYUAN_ENABLE_PBR),
     hunyuanGenerateType: one(flags, "generate-type", DEFAULT_HUNYUAN_GENERATE_TYPE),
+    hunyuanPolygonType: one(flags, "polygon-type", DEFAULT_HUNYUAN_POLYGON_TYPE),
     meshyTopology: one(flags, "topology", DEFAULT_MESHY_TOPOLOGY),
     meshyTargetPolycount: one(flags, "target-polycount", DEFAULT_MESHY_TARGET_POLYCOUNT),
     meshySymmetryMode: one(flags, "symmetry-mode", DEFAULT_MESHY_SYMMETRY_MODE),

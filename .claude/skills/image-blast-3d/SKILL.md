@@ -1,7 +1,7 @@
 ---
 name: image-blast-3d
 description: Generate one specified 3D object. Use when the user names exactly one object to make, or provides one image plus the object name/description.
-argument-hint: [world-name] [object-id/name or image path + object description] [--provider meshy|hunyuan] [--target-polycount N] [--face-count N] [--enable-pbr true|false]
+argument-hint: [world-name] [object-id/name or image path + object description] [--provider meshy|hunyuan] [--target-polycount N] [--face-count N] [--generate-type Normal|LowPoly|Geometry] [--polygon-type triangle|quadrilateral] [--enable-pbr true|false]
 allowed-tools: Read Write Glob Bash(ls *) Bash(node .claude/scripts/project/project-state.mjs *) Bash(node .claude/scripts/project/ensure-local-assets.mjs *) Bash(node .claude/scripts/asset-pipeline/generate-single-asset.mjs *)
 context: fork
 agent: image-blast-3d
@@ -58,6 +58,7 @@ Hunyuan is the default 3D provider. Hunyuan defaults are `--face-count 50000`, `
 
 - `--face-count <40000-1500000>`
 - `--generate-type Normal|LowPoly|Geometry`
+- `--polygon-type triangle|quadrilateral` for `LowPoly`
 - `--enable-pbr true|false`
 
 Pass `--provider meshy` only when the user asks for Meshy. Meshy defaults are:

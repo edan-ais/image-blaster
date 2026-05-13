@@ -5,11 +5,12 @@ import {
 } from "./fal-queue.mjs";
 import { runFalImageTo3DProvider } from "./fal-3d-provider.mjs";
 
-export const HUNYUAN_3D_ENDPOINT = "fal-ai/hunyuan-3d/v3.1/pro/image-to-3d";
+export const HUNYUAN_3D_ENDPOINT = "fal-ai/hunyuan3d-v3/image-to-3d";
 export const HUNYUAN_3D_PROVIDER = "hunyuan";
 export const DEFAULT_HUNYUAN_FACE_COUNT = 50000;
 export const DEFAULT_HUNYUAN_ENABLE_PBR = true;
 export const DEFAULT_HUNYUAN_GENERATE_TYPE = "Normal";
+export const DEFAULT_HUNYUAN_POLYGON_TYPE = "triangle";
 
 const MIN_FACE_COUNT = 40000;
 const MAX_FACE_COUNT = 1500000;
@@ -17,6 +18,10 @@ const GENERATE_TYPES = new Map([
   ["normal", "Normal"],
   ["lowpoly", "LowPoly"],
   ["geometry", "Geometry"]
+]);
+const POLYGON_TYPES = new Map([
+  ["triangle", "triangle"],
+  ["quadrilateral", "quadrilateral"]
 ]);
 
 function normalizeFaceCount(value) {
@@ -37,6 +42,14 @@ function normalizeGenerateType(value) {
   return normalized;
 }
 
+function normalizePolygonType(value) {
+  const normalized = POLYGON_TYPES.get(String(value).trim().toLowerCase());
+  if (!normalized) {
+    throw new Error("polygon-type must be one of: triangle, quadrilateral.");
+  }
+  return normalized;
+}
+
 function normalizeBoolean(value) {
   if (typeof value === "boolean") return value;
   const normalized = String(value).trim().toLowerCase();
@@ -53,6 +66,7 @@ export async function runHunyuan3D(options) {
     faceCount = DEFAULT_HUNYUAN_FACE_COUNT,
     enablePbr = DEFAULT_HUNYUAN_ENABLE_PBR,
     generateType = DEFAULT_HUNYUAN_GENERATE_TYPE,
+    polygonType = DEFAULT_HUNYUAN_POLYGON_TYPE,
     metadataPath,
     metadata = {},
     onSubmit,
@@ -65,12 +79,16 @@ export async function runHunyuan3D(options) {
   const normalizedFaceCount = normalizeFaceCount(faceCount);
   const normalizedGenerateType = normalizeGenerateType(generateType);
   const normalizedEnablePbr = normalizeBoolean(enablePbr);
+  const normalizedPolygonType = normalizePolygonType(polygonType);
 
   const input = {
     generate_type: normalizedGenerateType,
     enable_pbr: normalizedEnablePbr,
     face_count: normalizedFaceCount
   };
+  if (normalizedGenerateType === "LowPoly") {
+    input.polygon_type = normalizedPolygonType;
+  }
 
   return runFalImageTo3DProvider({
     endpoint: HUNYUAN_3D_ENDPOINT,
@@ -95,7 +113,7 @@ async function main() {
 
   if (!image || !outputDir) {
     throw new Error(
-      "Usage: node hunyuan-3d.mjs --image <path-or-url> --output-dir <dir> [--asset-name <name>] [--face-count <40000-1500000>] [--generate-type Normal|LowPoly|Geometry] [--enable-pbr true|false]"
+      "Usage: node hunyuan-3d.mjs --image <path-or-url> --output-dir <dir> [--asset-name <name>] [--face-count <40000-1500000>] [--generate-type Normal|LowPoly|Geometry] [--polygon-type triangle|quadrilateral] [--enable-pbr true|false]"
     );
   }
 
@@ -105,7 +123,8 @@ async function main() {
     assetName: one(flags, "asset-name"),
     faceCount: one(flags, "face-count", DEFAULT_HUNYUAN_FACE_COUNT),
     enablePbr: one(flags, "enable-pbr", DEFAULT_HUNYUAN_ENABLE_PBR),
-    generateType: one(flags, "generate-type", DEFAULT_HUNYUAN_GENERATE_TYPE)
+    generateType: one(flags, "generate-type", DEFAULT_HUNYUAN_GENERATE_TYPE),
+    polygonType: one(flags, "polygon-type", DEFAULT_HUNYUAN_POLYGON_TYPE)
   });
 
   console.log(JSON.stringify(summary, null, 2));
