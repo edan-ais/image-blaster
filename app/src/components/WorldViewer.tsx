@@ -167,7 +167,7 @@ export function WorldViewer({
     if (controllerResetToken > 0) charRef.current?.reset()
   }, [controllerResetToken])
 
-  const splatUrl = desiredWorld ? getSplatUrl(desiredWorld) : ''
+  const splatUrl = desiredWorld ? getSplatUrl(desiredWorld, viewerQuality) : ''
   const { ground_plane_offset, flip_y, metric_scale_factor } = desiredWorld?.assets.splats.semantics_metadata ?? DEFAULT_WORLD_SEMANTICS
   const flipY = flip_y ?? true
   const baseMetricScaleFactor = metric_scale_factor ?? 1

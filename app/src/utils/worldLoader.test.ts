@@ -66,7 +66,7 @@ describe('worldLoader', () => {
     vi.unstubAllGlobals()
   })
 
-  it('getSplatUrl always uses full-res', () => {
+  it('getSplatUrl high quality prefers 500k over full-res', () => {
     const world = {
       ...exampleWorld,
       assets: {
@@ -81,11 +81,25 @@ describe('worldLoader', () => {
       },
     }
     const url = getSplatUrl(world)
-    expect(url).toBe('/worlds/example/output/world/0-world-full_res.spz')
+    expect(url).toBe('/worlds/example/output/world/0-world-500k.spz')
   })
 
-  it('getSplatUrl returns empty when full-res is absent', () => {
-    expect(getSplatUrl(exampleWorld)).toBe('')
+  it('getSplatUrl high quality falls back to full-res when 500k absent', () => {
+    const world = {
+      ...exampleWorld,
+      assets: {
+        ...exampleWorld.assets,
+        splats: {
+          ...exampleWorld.assets.splats,
+          spz_urls: { full_res: '/worlds/example/output/world/0-world-full_res.spz' },
+        },
+      },
+    }
+    expect(getSplatUrl(world)).toBe('/worlds/example/output/world/0-world-full_res.spz')
+  })
+
+  it('getSplatUrl returns 500k when available', () => {
+    expect(getSplatUrl(exampleWorld)).toBe('/worlds/example/output/world/0-world-500k.spz')
   })
 
   it('getSplatUrl ignores non-full-res splats', () => {
@@ -102,17 +116,17 @@ describe('worldLoader', () => {
     expect(getSplatUrl(world)).toBe('')
   })
 
-  it('getSplatUrl refuses provider URLs', () => {
+  it('getSplatUrl accepts absolute https URLs for CDN-hosted assets', () => {
     const world = {
       ...exampleWorld,
       assets: {
         ...exampleWorld.assets,
         splats: {
           ...exampleWorld.assets.splats,
-          spz_urls: { full_res: 'https://cdn.example.com/splat_full.spz' },
+          spz_urls: { '500k': 'https://cdn.example.com/splat_500k.spz', full_res: 'https://cdn.example.com/splat_full.spz' },
         },
       },
     }
-    expect(getSplatUrl(world)).toBe('')
+    expect(getSplatUrl(world)).toBe('https://cdn.example.com/splat_500k.spz')
   })
 })

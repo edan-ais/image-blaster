@@ -7,7 +7,9 @@ export type ControllerMode = 'fly' | 'fps'
 function defaultViewerQuality() {
   if (typeof window === 'undefined') return ViewerQuality.High
   const mobileQuery = '(hover: none), (pointer: coarse), (max-width: 767px)'
-  return window.matchMedia(mobileQuery).matches ? ViewerQuality.Low : ViewerQuality.High
+  if (window.matchMedia(mobileQuery).matches) return ViewerQuality.Low
+  if (navigator.userAgent.includes('CrOS')) return ViewerQuality.Low
+  return ViewerQuality.High
 }
 
 interface DebugStore {

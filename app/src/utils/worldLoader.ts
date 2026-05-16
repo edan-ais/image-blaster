@@ -1,5 +1,5 @@
 import worlds from 'virtual:worlds'
-import { type World, type WorldEntry } from '../types/world'
+import { ViewerQuality, type World, type WorldEntry } from '../types/world'
 
 export function loadWorlds(): WorldEntry[] {
   return worlds as WorldEntry[]
@@ -14,10 +14,15 @@ export async function fetchWorlds(): Promise<WorldEntry[]> {
 }
 
 function localWorldAssetUrl(url: string | undefined): string {
-  return url?.startsWith('/worlds/') ? url : ''
+  if (!url) return ''
+  if (url.startsWith('/worlds/') || url.startsWith('http://') || url.startsWith('https://')) return url
+  return ''
 }
 
-export function getSplatUrl(world: World): string {
+export function getSplatUrl(world: World, quality: ViewerQuality = ViewerQuality.High): string {
   const urls = world.assets.splats.spz_urls
-  return localWorldAssetUrl(urls.full_res)
+  if (quality === ViewerQuality.Low) {
+    return localWorldAssetUrl(urls['100k'] ?? urls['150k'] ?? urls['500k'] ?? urls.full_res)
+  }
+  return localWorldAssetUrl(urls['500k'] ?? urls.full_res)
 }

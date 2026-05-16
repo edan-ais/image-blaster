@@ -237,7 +237,7 @@ async function latestWorldArtifact(outputDir) {
   const worlds = entries
     .filter((entry) => entry.isFile())
     .map((entry) => parseIndexedName(entry.name))
-    .filter((entry) => entry?.slug === "world" && entry.extension === ".json");
+    .filter((entry) => entry?.slug === "world" && entry.extension === ".json" && !entry.hidden);
   return worlds.sort((a, b) => b.index - a.index || b.name.localeCompare(a.name))[0];
 }
 
