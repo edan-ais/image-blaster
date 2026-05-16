@@ -238,6 +238,9 @@ function worldsPlugin(): Plugin {
         if (!indexes.size && models.some((model) => model.index === undefined)) {
           indexes.add(Number.MAX_SAFE_INTEGER)
         }
+        if (!indexes.size && objectCdnUrl) {
+          indexes.add(0)
+        }
 
         return [...indexes].sort((a, b) => a - b).flatMap((indexValue) => {
           const index = indexValue === Number.MAX_SAFE_INTEGER ? undefined : indexValue
