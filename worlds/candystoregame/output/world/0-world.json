@@ -1,0 +1,38 @@
+{
+  "world_id": "859e55ec-b7a6-40b4-aa97-cebe92a2e04d",
+  "display_name": "",
+  "tags": null,
+  "assets": {
+    "mesh": {
+      "collider_mesh_url": "https://cdn.marble.worldlabs.ai/859e55ec-b7a6-40b4-aa97-cebe92a2e04d/97c9fa64.glb"
+    },
+    "imagery": {
+      "pano_url": "https://cdn.marble.worldlabs.ai/859e55ec-b7a6-40b4-aa97-cebe92a2e04d/1873547d-b94b-4162-b52d-bba393e7b8b5_panos/rgb_0.png"
+    },
+    "splats": {
+      "spz_urls": {
+        "500k": "https://cdn.marble.worldlabs.ai/859e55ec-b7a6-40b4-aa97-cebe92a2e04d/fe978242-c1c0-414b-a970-70be895fa387_ceramic_500k.spz",
+        "100k": "https://cdn.marble.worldlabs.ai/859e55ec-b7a6-40b4-aa97-cebe92a2e04d/62aec816-a65f-4823-a802-48fea7ee1079_dust_100k.spz",
+        "150k": "https://cdn.marble.worldlabs.ai/859e55ec-b7a6-40b4-aa97-cebe92a2e04d/b0f0e963-b5d2-4188-bb73-fdf530339883_ceramic_150k.spz",
+        "full_res": "https://cdn.marble.worldlabs.ai/859e55ec-b7a6-40b4-aa97-cebe92a2e04d/f7fda395-58b1-4b71-8d08-48f9e3523c83_ceramic.spz"
+      },
+      "semantics_metadata": {
+        "metric_scale_factor": 2.4631171,
+        "ground_plane_offset": 1.4563437
+      }
+    },
+    "thumbnail_url": "https://cdn.marble.worldlabs.ai/859e55ec-b7a6-40b4-aa97-cebe92a2e04d/da14d0ad-7ec5-41bc-bc3c-627331c2f553_sand_mpi/thumbnail.webp",
+    "caption": "The scene is a vibrant, empty retail candy store interior, captured in a realistic style, evoking a playful yet pristine atmosphere. The overall tone is cheerful and inviting, with bright colors and a whimsical decorative theme. The space is characterized by an exposed brick wall on the left, contrasting with painted pink and blue walls that extend throughout the interior on the right. Candy-themed murals adorn the blue sections of the walls, featuring various lollipops and sweet motifs. The floor is constructed from light oak hardwood planks, exhibiting a warm, polished sheen. Track lighting, mounted on the ceiling, provides focused illumination, highlighting the architectural details and colorful decor. Colorful streamers, draped across the ceiling, add a festive and celebratory element to the space. The architectural shell of the store is bare, completely devoid of display racks, kiosks, or other objects, emphasizing its untouched state. The exposed brick wall continues around the corner, maintaining its rustic texture, while the painted walls and candy murals extend along the remaining perimeters of the room, creating a cohesive and immersive environment. The light oak hardwood flooring spans the entirety of the open area, providing a continuous, clean surface. The track lighting runs along the ceiling in parallel lines, ensuring an even distribution of light throughout the store. The colorful ceiling streamers are arranged to create an overhead canopy effect, enveloping the space in a cheerful embrace. The 360 scene is faultless."
+  },
+  "created_at": null,
+  "updated_at": null,
+  "permission": {
+    "public": false,
+    "allowed_readers": [],
+    "allowed_writers": [],
+    "allow_id_access": false
+  },
+  "world_prompt": null,
+  "world_marble_url": "https://marble.worldlabs.ai/world/859e55ec-b7a6-40b4-aa97-cebe92a2e04d",
+  "model": null
+}

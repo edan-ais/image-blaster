@@ -1,0 +1,25 @@
+{
+  "schema_version": 1,
+  "world": "candystoregame",
+  "object": {
+    "id": "jelly-belly-display-rack",
+    "name": "Jelly Belly display rack",
+    "description": "Large red metal multi-shelf display rack with four to five horizontal tiers, mounted with red Jelly Belly branded sign holders at the top. Shelves are stocked with colorful bagged candy packages. Frame is tubular red-painted steel.",
+    "materials": [
+      "red painted steel",
+      "plastic sign holders"
+    ],
+    "source_images": [
+      "worlds/candystoregame/source/0-candystoregame.jpg"
+    ],
+    "evidence": [
+      {
+        "image": "worlds/candystoregame/source/0-candystoregame.jpg",
+        "location_in_image": "left side, against the brick wall"
+      }
+    ],
+    "generate_as_3d_object": true,
+    "working_dir": "worlds/candystoregame/output/jelly-belly-display-rack"
+  },
+  "updated_at": "2026-05-16T00:51:30.113Z"
+}

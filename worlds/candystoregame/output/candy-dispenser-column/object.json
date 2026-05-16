@@ -1,0 +1,25 @@
+{
+  "schema_version": 1,
+  "world": "candystoregame",
+  "object": {
+    "id": "candy-dispenser-column",
+    "name": "Wall candy dispenser column",
+    "description": "Dark rectangular column with rows of individual candy dispensers or vending pods mounted on the face. Each pod appears to be a small transparent plastic unit. Column is floor-standing, approximately 1.5 meters tall.",
+    "materials": [
+      "dark plastic or painted MDF",
+      "transparent acrylic pods"
+    ],
+    "source_images": [
+      "worlds/candystoregame/source/0-candystoregame.jpg"
+    ],
+    "evidence": [
+      {
+        "image": "worlds/candystoregame/source/0-candystoregame.jpg",
+        "location_in_image": "center-background, behind the Pick-a-Powder kiosk"
+      }
+    ],
+    "generate_as_3d_object": true,
+    "working_dir": "worlds/candystoregame/output/candy-dispenser-column"
+  },
+  "updated_at": "2026-05-16T00:36:38.062Z"
+}

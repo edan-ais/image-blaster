@@ -1,0 +1,105 @@
+{
+  "schema_version": 1,
+  "world": "candystoregame",
+  "source_images": ["worlds/candystoregame/source/0-candystoregame.jpg"],
+  "scene_name": "Candy Store Interior",
+  "short_caption": "Colorful retail candy store with display racks and dispensers.",
+  "literal_description": "Interior of a retail candy store. The left wall is exposed brick with a large red multi-shelf metal display rack bearing Jelly Belly branding signs and stocked with bagged candy. The center of the room has a tall cylindrical candy dispenser kiosk with Pick-a-Powder branding, a character illustration, and a conical funnel at its base. A dark column with rows of individual candy dispensers stands behind it. To the right is a tall cylindrical multi-tier candy spinner carousel with Rainbow Bits branding in blue, red, and green. The floor is light oak hardwood planking. The right walls are painted pink and blue with candy-themed murals. Track lighting is mounted on the ceiling. Yellow, blue, and other latex balloons hang from the ceiling. Colorful streamers and decorative elements hang across the upper portion of the room. Blue cylindrical candy tubes are grouped on a small display stand near the kiosk.",
+  "environment": "Indoor retail candy store with exposed brick left wall, painted pink and blue right walls, oak hardwood floors, and track ceiling lighting.",
+  "visual_style": "photorealistic, saturated, commercial retail interior",
+  "lighting": "Track lighting from ceiling, warm-to-neutral color temperature, moderate contrast, mixed directional and ambient light, no strong single shadow direction.",
+  "atmosphere": "No visible fog, dust, smoke, or haze. Clean indoor air.",
+  "ambient_sound": "Indoor retail ambient hum, faint air conditioning, occasional candy packaging rustle.",
+  "objects": [
+    {
+      "id": "jelly-belly-display-rack",
+      "name": "Jelly Belly display rack",
+      "description": "Large red metal multi-shelf display rack with four to five horizontal tiers, mounted with red Jelly Belly branded sign holders at the top. Shelves are stocked with colorful bagged candy packages. Frame is tubular red-painted steel.",
+      "count_estimate": 1,
+      "materials": ["red painted steel", "plastic sign holders"],
+      "source_images": ["worlds/candystoregame/source/0-candystoregame.jpg"],
+      "evidence": [
+        {
+          "image": "worlds/candystoregame/source/0-candystoregame.jpg",
+          "location_in_image": "left side, against the brick wall"
+        }
+      ],
+      "generate_as_3d_object": true
+    },
+    {
+      "id": "pick-a-powder-kiosk",
+      "name": "Pick-a-Powder candy dispenser kiosk",
+      "description": "Tall cylindrical candy dispenser kiosk, approximately 1.5 meters tall. Upper section has branded graphics showing a cartoon character and Pick-a-Powder Candy text on a blue background. Lower section tapers into a dark conical funnel base. A clear acrylic dispensing section is visible midway.",
+      "count_estimate": 1,
+      "materials": ["acrylic", "printed vinyl wrap", "plastic"],
+      "source_images": ["worlds/candystoregame/source/0-candystoregame.jpg"],
+      "evidence": [
+        {
+          "image": "worlds/candystoregame/source/0-candystoregame.jpg",
+          "location_in_image": "center of room, mid-ground"
+        }
+      ],
+      "generate_as_3d_object": true
+    },
+    {
+      "id": "rainbow-bits-spinner-carousel",
+      "name": "Rainbow Bits candy spinner carousel",
+      "description": "Tall cylindrical multi-tier rotating display carousel, approximately 1.6 meters tall. Has multiple horizontal tiers of candy dispensers. Branded with Rainbow Bits text and colored in blue, red, and green sections. Base is a flat circular pedestal.",
+      "count_estimate": 1,
+      "materials": ["injection-molded plastic", "printed labels"],
+      "source_images": ["worlds/candystoregame/source/0-candystoregame.jpg"],
+      "evidence": [
+        {
+          "image": "worlds/candystoregame/source/0-candystoregame.jpg",
+          "location_in_image": "right side of room, foreground"
+        }
+      ],
+      "generate_as_3d_object": true
+    },
+    {
+      "id": "candy-dispenser-column",
+      "name": "Wall candy dispenser column",
+      "description": "Dark rectangular column with rows of individual candy dispensers or vending pods mounted on the face. Each pod appears to be a small transparent plastic unit. Column is floor-standing, approximately 1.5 meters tall.",
+      "count_estimate": 1,
+      "materials": ["dark plastic or painted MDF", "transparent acrylic pods"],
+      "source_images": ["worlds/candystoregame/source/0-candystoregame.jpg"],
+      "evidence": [
+        {
+          "image": "worlds/candystoregame/source/0-candystoregame.jpg",
+          "location_in_image": "center-background, behind the Pick-a-Powder kiosk"
+        }
+      ],
+      "generate_as_3d_object": true
+    },
+    {
+      "id": "latex-balloon",
+      "name": "Latex balloon",
+      "description": "Round inflated latex balloon on a string. Visible colors include yellow and blue. Tied at the bottom with a thin ribbon. Approximately 30cm diameter.",
+      "count_estimate": 3,
+      "materials": ["latex"],
+      "source_images": ["worlds/candystoregame/source/0-candystoregame.jpg"],
+      "evidence": [
+        {
+          "image": "worlds/candystoregame/source/0-candystoregame.jpg",
+          "location_in_image": "upper center and upper right, hanging from ceiling"
+        }
+      ],
+      "generate_as_3d_object": true
+    },
+    {
+      "id": "candy-tube-display-stand",
+      "name": "Candy tube display stand",
+      "description": "Small floor-standing display holding a cluster of blue cylindrical candy tubes (Pop Rocks or similar). Tubes are approximately 20cm tall with printed labels. The holder appears to be a low acrylic or wire stand.",
+      "count_estimate": 1,
+      "materials": ["acrylic or wire", "printed cardboard tubes"],
+      "source_images": ["worlds/candystoregame/source/0-candystoregame.jpg"],
+      "evidence": [
+        {
+          "image": "worlds/candystoregame/source/0-candystoregame.jpg",
+          "location_in_image": "center-left foreground, beside the Pick-a-Powder kiosk base"
+        }
+      ],
+      "generate_as_3d_object": true
+    }
+  ]
+}

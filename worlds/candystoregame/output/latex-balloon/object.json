@@ -1,0 +1,24 @@
+{
+  "schema_version": 1,
+  "world": "candystoregame",
+  "object": {
+    "id": "latex-balloon",
+    "name": "Latex balloon",
+    "description": "Round inflated latex balloon on a string. Visible colors include yellow and blue. Tied at the bottom with a thin ribbon. Approximately 30cm diameter.",
+    "materials": [
+      "latex"
+    ],
+    "source_images": [
+      "worlds/candystoregame/source/0-candystoregame.jpg"
+    ],
+    "evidence": [
+      {
+        "image": "worlds/candystoregame/source/0-candystoregame.jpg",
+        "location_in_image": "upper center and upper right, hanging from ceiling"
+      }
+    ],
+    "generate_as_3d_object": true,
+    "working_dir": "worlds/candystoregame/output/latex-balloon"
+  },
+  "updated_at": "2026-05-16T00:22:56.773Z"
+}

@@ -1,0 +1,25 @@
+{
+  "schema_version": 1,
+  "world": "candystoregame",
+  "object": {
+    "id": "rainbow-bits-spinner-carousel",
+    "name": "Rainbow Bits candy spinner carousel",
+    "description": "Tall cylindrical multi-tier rotating display carousel, approximately 1.6 meters tall. Has multiple horizontal tiers of candy dispensers. Branded with Rainbow Bits text and colored in blue, red, and green sections. Base is a flat circular pedestal.",
+    "materials": [
+      "injection-molded plastic",
+      "printed labels"
+    ],
+    "source_images": [
+      "worlds/candystoregame/source/0-candystoregame.jpg"
+    ],
+    "evidence": [
+      {
+        "image": "worlds/candystoregame/source/0-candystoregame.jpg",
+        "location_in_image": "right side of room, foreground"
+      }
+    ],
+    "generate_as_3d_object": true,
+    "working_dir": "worlds/candystoregame/output/rainbow-bits-spinner-carousel"
+  },
+  "updated_at": "2026-05-16T00:22:53.430Z"
+}

@@ -1,0 +1,25 @@
+{
+  "schema_version": 1,
+  "world": "candystoregame",
+  "object": {
+    "id": "candy-tube-display-stand",
+    "name": "Candy tube display stand",
+    "description": "Small floor-standing display holding a cluster of blue cylindrical candy tubes (Pop Rocks or similar). Tubes are approximately 20cm tall with printed labels. The holder appears to be a low acrylic or wire stand.",
+    "materials": [
+      "acrylic or wire",
+      "printed cardboard tubes"
+    ],
+    "source_images": [
+      "worlds/candystoregame/source/0-candystoregame.jpg"
+    ],
+    "evidence": [
+      {
+        "image": "worlds/candystoregame/source/0-candystoregame.jpg",
+        "location_in_image": "center-left foreground, beside the Pick-a-Powder kiosk base"
+      }
+    ],
+    "generate_as_3d_object": true,
+    "working_dir": "worlds/candystoregame/output/candy-tube-display-stand"
+  },
+  "updated_at": "2026-05-16T00:39:32.855Z"
+}

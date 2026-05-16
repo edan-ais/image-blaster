@@ -390,7 +390,12 @@ function worldsPlugin(): Plugin {
     for (const key of Object.keys(existingSpzUrls)) {
       const assetKey = assetKeyForFilename(key)
       const filename = worldAssetFilename(files, index, `world-${assetKey}`, new Set(['.spz']))
-      if (filename) spzUrls[key] = worldAssetUrl(slug, filename)
+      if (filename) {
+        spzUrls[key] = worldAssetUrl(slug, filename)
+      } else {
+        const cdnUrl = httpImageUrl(existingSpzUrls[key])
+        if (cdnUrl) spzUrls[key] = cdnUrl
+      }
     }
 
     for (const file of indexedFiles(files, { extensions: new Set(['.spz']) })) {
@@ -413,11 +418,11 @@ function worldsPlugin(): Plugin {
         ...(world.assets ?? {}),
         mesh: {
           ...(world.assets?.mesh ?? {}),
-          collider_mesh_url: worldAssetUrl(slug, collider),
+          collider_mesh_url: worldAssetUrl(slug, collider) || httpImageUrl(world.assets?.mesh?.collider_mesh_url) || '',
         },
         imagery: {
           ...(world.assets?.imagery ?? {}),
-          pano_url: worldAssetUrl(slug, pano),
+          pano_url: worldAssetUrl(slug, pano) || httpImageUrl(world.assets?.imagery?.pano_url) || '',
         },
         splats: {
           ...(world.assets?.splats ?? {}),
@@ -429,7 +434,7 @@ function worldsPlugin(): Plugin {
             ...((world.assets?.splats?.semantics_metadata ?? {}) as Record<string, unknown>),
           },
         },
-        thumbnail_url: worldAssetUrl(slug, thumbnail),
+        thumbnail_url: worldAssetUrl(slug, thumbnail) || httpImageUrl(world.assets?.thumbnail_url) || '',
       },
     }
   }
