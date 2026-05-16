@@ -152,12 +152,8 @@ export function WorldViewer({
   const sunIntensity = useDebugStore((s) => s.sunIntensity)
   const sunColor = useDebugStore((s) => s.sunColor)
   const [sourceThumbnailCollapsed, setSourceThumbnailCollapsed] = useState(false)
-  const colliderUrl = desiredWorld?.assets.mesh.collider_mesh_url.startsWith('/worlds/')
-    ? desiredWorld.assets.mesh.collider_mesh_url
-    : ''
-  const panoUrl = desiredWorld?.assets.imagery.pano_url.startsWith('/worlds/')
-    ? desiredWorld.assets.imagery.pano_url
-    : ''
+  const colliderUrl = desiredWorld?.assets.mesh.collider_mesh_url ?? ''
+  const panoUrl = desiredWorld?.assets.imagery.pano_url ?? ''
 
   useEffect(() => {
     charRef.current?.reset()
