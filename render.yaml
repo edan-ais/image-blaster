@@ -1,0 +1,10 @@
+services:
+  - type: web
+    name: image-blaster
+    env: static
+    buildCommand: cd app && npm install && npm run build
+    staticPublishPath: ./app/dist
+    routes:
+      - type: rewrite
+        source: /*
+        destination: /index.html
