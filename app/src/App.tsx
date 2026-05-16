@@ -215,11 +215,7 @@ function LoadedApp({
           />
         </div>
       )}
-      {!editing && uiVisible && (
-        <>
-          <TouchControls />
-        </>
-      )}
+      {!editing && <TouchControls />}
       {uiVisible && (
         <div className="fixed inset-x-0 bottom-4 z-20 flex justify-center px-4 sm:left-4 sm:right-auto sm:justify-start sm:px-0">
           <BottomLeftControls />
