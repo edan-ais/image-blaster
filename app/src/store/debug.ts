@@ -89,7 +89,7 @@ export const useDebugStore = create<DebugStore>()(
       setShowOrigin: (showOrigin) => set({ showOrigin }),
       butterfliesEnabled: false,
       setButterfliesEnabled: (butterfliesEnabled) => set({ butterfliesEnabled }),
-      controllerMode: 'fly' as ControllerMode,
+      controllerMode: 'fps' as ControllerMode,
       setControllerMode: (controllerMode) => set({ controllerMode }),
       flyMouseSensitivity: 0.003,
       setFlyMouseSensitivity: (flyMouseSensitivity) => set({ flyMouseSensitivity }),
@@ -130,7 +130,7 @@ export const useDebugStore = create<DebugStore>()(
     }),
     {
       name: 'image-blaster-debug',
-      version: 11,
+      version: 12,
       migrate: (persisted, version) => {
         if (!persisted || typeof persisted !== 'object') return persisted
         const state = persisted as Record<string, unknown>

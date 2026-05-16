@@ -87,7 +87,7 @@ function LoadedApp({
   const levaCollapsed = useDebugStore((s) => s.levaCollapsed)
   const setLevaCollapsed = useDebugStore((s) => s.setLevaCollapsed)
   const [location] = useLocation()
-  const [uiHidden, setUiHidden] = useState(false)
+  const [uiHidden, setUiHidden] = useState(true)
   const [sceneProjectEnabled, setSceneProjectEnabled] = useState(true)
   const [selectedWorldVersions, setSelectedWorldVersions] = useState<Record<string, number>>({})
   const [hoveredObjectAssetId, setHoveredObjectAssetId] = useState<string | null>(null)

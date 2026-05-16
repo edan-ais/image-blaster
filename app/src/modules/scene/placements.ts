@@ -2,7 +2,7 @@ import type { WorldObjectAsset, WorldObjectPlacement } from '../../types/world'
 
 const GRID_CELL_SIZE = 1
 const GRID_MAX_COLUMNS = 3
-export const OBJECT_RESET_ORIGIN: [number, number, number] = [0, 0, -2]
+export const OBJECT_RESET_ORIGIN: [number, number, number] = [0, 3, -2]
 
 export function gridPosition(index: number, total: number): [number, number, number] {
   const columns = Math.min(GRID_MAX_COLUMNS, Math.max(1, total))
