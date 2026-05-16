@@ -22,5 +22,6 @@
     "generate_as_3d_object": true,
     "working_dir": "worlds/candystoregame/output/pick-a-powder-kiosk"
   },
-  "updated_at": "2026-05-16T01:04:37.016Z"
+  "updated_at": "2026-05-16T01:04:37.016Z",
+  "model_url": "https://v3b.fal.media/files/b/0a9a6050/A_c_2dkc9epvaWVhllNbD_model.glb"
 }

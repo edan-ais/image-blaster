@@ -205,10 +205,12 @@ function worldsPlugin(): Plugin {
         const images = indexedFiles(files, { extensions: IMAGE_EXTENSIONS })
         const objectJsonPath = path.join(objectDir, 'object.json')
         let displayName = entry.name
+        let objectCdnUrl: string | undefined
         if (fs.existsSync(objectJsonPath) && fs.statSync(objectJsonPath).isFile()) {
           try {
             const json = JSON.parse(fs.readFileSync(objectJsonPath, 'utf-8'))
             displayName = json.object?.name ?? json.name ?? displayName
+            objectCdnUrl = httpImageUrl(json.model_url)
           } catch {
             displayName = entry.name
           }
@@ -248,7 +250,9 @@ function worldsPlugin(): Plugin {
             ? worldsUrl(slug, path.join('output', entry.name, referenceImage.name))
             : undefined
           const requestStatus = statusText(modelRequest?.data.status ?? imageRequest?.data.status)
-          const complete = Boolean(model)
+          const localUrl = model ? worldsUrl(slug, path.join('output', entry.name, model.name)) : ''
+          const cdnUrl = !localUrl && index === 0 ? objectCdnUrl : undefined
+          const complete = Boolean(model || cdnUrl)
           if (!complete && !imageRequest && !modelRequest) return []
 
           return {
@@ -260,7 +264,7 @@ function worldsPlugin(): Plugin {
             variantLabel: model ? versionLabel(model) : `v${index}`,
             fileName: model?.name,
             name: displayName,
-            url: model ? worldsUrl(slug, path.join('output', entry.name, model.name)) : '',
+            url: localUrl || cdnUrl || '',
             referenceImageUrl,
             thumbnailUrl: thumbnail ? worldsUrl(slug, path.join('output', entry.name, thumbnail.name)) : referenceImageUrl,
             sfxUrls: readSfxUrls(slug, path.join('output', entry.name, 'sfx')),
